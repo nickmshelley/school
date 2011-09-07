@@ -19,17 +19,11 @@
               #xE1 #xF8 #x98 #x11 #x69 #xD9 #x8E #x94 #x9B #x1E #x87 #xE9 #xCE #x55 #x28 #xDF
               #x8C #xA1 #x89 #x0D #xBF #xE6 #x42 #x68 #x41 #x99 #x2D #x0F #xB0 #x54 #xBB #x16))
 
-
-(define global-state (vector (bytes #xd4 #xbf #x5d #x30)
-                      (bytes #xe0 #xb4 #x52 #xae)
-                      (bytes #xb8 #x41 #x11 #xf1)
-                      (bytes #x1e #x27 #x98 #xe5)))
-
 (define (print-state state)
-          (for ([c (in-vector state)])
-            (for ([v (in-bytes c)])
-              (printf "~x " v))
-            (printf "~n")))
+  (for ([c (in-vector state)])
+    (for ([v (in-bytes c)])
+      (printf "~x " v))
+    (printf "~n")))
 
 (define (printb ...)
   (printf "~b" ...))
@@ -63,8 +57,23 @@
 (check-equal? (mult #x57 3) (bitwise-xor #x57 #xae))
 (check-equal? (mult #x57 #x13) #xfe)
 
-#;(define (sub-bytes state)
-  (define new-state (vector-copy s)))
+(define (substitute val)
+  (bytes-ref sbox (+ (* (arithmetic-shift val -4) 16) (modulo val 16))))
+(check-equal? (substitute 0) #x63)
+(check-equal? (substitute #x3a) #x80)
+
+(define (sub-bytes state)
+  (for/vector ([c (in-vector state)])
+    (list->bytes (for/list ([v (in-bytes c)])
+                   (substitute v)))))
+(check-equal? (sub-bytes (vector (bytes #x19 #x3d #xe3 #xbe)
+                                 (bytes #xa0 #xf4 #xe2 #x2b)
+                                 (bytes #x9a #xc6 #x8d #x2a)
+                                 (bytes #xe9 #xf8 #x48 #x08)))
+              (vector (bytes #xd4 #x27 #x11 #xae)
+                      (bytes #xe0 #xbf #x98 #xf1)
+                      (bytes #xb8 #xb4 #x5d #xe5)
+                      (bytes #x1e #x41 #x52 #x30)))
 
 ; mix-columns : state -> state
 (define (mix-columns state)
@@ -91,5 +100,10 @@
                   (bytes-ref c 1)
                   (bytes-ref c 2)))))
 
-#;(define (cipher input)
-  ())
+(define (cipher input)
+  (sub-bytes input))
+
+(cipher (vector (bytes #xd4 #xbf #x5d #x30)
+                (bytes #xe0 #xb4 #x52 #xae)
+                (bytes #xb8 #x41 #x11 #xf1)
+                (bytes #x1e #x27 #x98 #xe5)))
