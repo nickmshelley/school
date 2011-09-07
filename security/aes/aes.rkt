@@ -19,10 +19,13 @@
               #xE1 #xF8 #x98 #x11 #x69 #xD9 #x8E #x94 #x9B #x1E #x87 #xE9 #xCE #x55 #x28 #xDF
               #x8C #xA1 #x89 #x0D #xBF #xE6 #x42 #x68 #x41 #x99 #x2D #x0F #xB0 #x54 #xBB #x16))
 
+(define (state-ref state r c)
+  (bytes-ref (vector-ref state c) r))
+
 (define (print-state state)
-  (for ([c (in-vector state)])
-    (for ([v (in-bytes c)])
-      (printf "~x " v))
+  (for ([i (in-range 4)])
+    (for ([j (in-range 4)])
+      (printf "~x " (state-ref state i j)))
     (printf "~n")))
 
 (define (printb ...)
@@ -30,12 +33,6 @@
 
 (define (printx ...)
   (printf "~x~n" ...))
-
-(define (state-ref state r c)
-  (vector-ref state (+ (* c 4) r)))
-
-(define (state-set! state r c v)
-  (vector-set! state (+ (* c 4) r) v))
 
 ; xtime : num -> num
 ; argument n is assumed to be < 16 (ie a byte)
@@ -64,8 +61,9 @@
 
 (define (sub-bytes state)
   (for/vector ([c (in-vector state)])
-    (list->bytes (for/list ([v (in-bytes c)])
-                   (substitute v)))))
+    (list->bytes 
+     (for/list ([v (in-bytes c)])
+       (substitute v)))))
 (check-equal? (sub-bytes (vector (bytes #x19 #x3d #xe3 #xbe)
                                  (bytes #xa0 #xf4 #xe2 #x2b)
                                  (bytes #x9a #xc6 #x8d #x2a)
@@ -74,6 +72,22 @@
                       (bytes #xe0 #xbf #x98 #xf1)
                       (bytes #xb8 #xb4 #x5d #xe5)
                       (bytes #x1e #x41 #x52 #x30)))
+
+(define (shift-rows state)
+  (for/vector ([i (in-range (vector-length state))])
+    (bytes
+     (state-ref state 0 i)
+     (state-ref state 1 (modulo (+ i 1) 4))
+     (state-ref state 2 (modulo (+ i 2) 4))
+     (state-ref state 3 (modulo (+ i 3) 4)))))
+(check-equal? (shift-rows (vector (bytes #xd4 #x27 #x11 #xae)
+                                  (bytes #xe0 #xbf #x98 #xf1)
+                                  (bytes #xb8 #xb4 #x5d #xe5)
+                                  (bytes #x1e #x41 #x52 #x30)))
+              (vector (bytes #xd4 #xbf #x5d #x30)
+                      (bytes #xe0 #xb4 #x52 #xae)
+                      (bytes #xb8 #x41 #x11 #xf1)
+                      (bytes #x1e #x27 #x98 #xe5)))
 
 ; mix-columns : state -> state
 (define (mix-columns state)
@@ -100,7 +114,25 @@
                   (bytes-ref c 1)
                   (bytes-ref c 2)))))
 
-(define (cipher input)
+(define (add-round-key state round-key)
+  (for/vector ([state-col (in-vector state)]
+               [key-col (in-vector round-key)])
+    (list->bytes
+     (for/list ([state-val (in-bytes state-col)]
+                [key-val (in-bytes key-col)])
+       (bitwise-xor key-val state-val)))))
+(check-equal? (
+
+;key-expand : vector -> vector
+;takes a key (as a vector of bytes) and returns an expanded vector of bytes (w array in spec)
+#;(define (key-expand key)
+    (define num-rounds (+ (vector-length key) 6))
+    (vector-append
+     key
+     (for/vector )))
+
+(define (cipher input key)
+  (define w (key-expand key))
   (sub-bytes input))
 
 (cipher (vector (bytes #xd4 #xbf #x5d #x30)
