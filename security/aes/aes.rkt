@@ -1,7 +1,7 @@
 #lang racket
 (require rackunit)
 
-(define sbox (vector
+(define sbox (bytes
               #x63 #x7C #x77 #x7B #xF2 #x6B #x6F #xC5 #x30 #x01 #x67 #x2B #xFE #xD7 #xAB #x76
               #xCA #x82 #xC9 #x7D #xFA #x59 #x47 #xF0 #xAD #xD4 #xA2 #xAF #x9C #xA4 #x72 #xC0
               #xB7 #xFD #x93 #x26 #x36 #x3F #xF7 #xCC #x34 #xA5 #xE5 #xF1 #x71 #xD8 #x31 #x15
@@ -20,17 +20,16 @@
               #x8C #xA1 #x89 #x0D #xBF #xE6 #x42 #x68 #x41 #x99 #x2D #x0F #xB0 #x54 #xBB #x16))
 
 
-(define state (vector #xd4 #xbf #x5d #x30
-                      #xe0 #xb4 #x52 #xae
-                      #xb8 #x41 #x11 #xf1
-                      #x1e #x27 #x98 #xe5))
+(define global-state (vector (bytes #xd4 #xbf #x5d #x30)
+                      (bytes #xe0 #xb4 #x52 #xae)
+                      (bytes #xb8 #x41 #x11 #xf1)
+                      (bytes #x1e #x27 #x98 #xe5)))
 
 (define (print-state state)
-  (printf "~x ~x ~x ~x~n~x ~x ~x ~x~n~x ~x ~x ~x~n~x ~x ~x ~x~n"
-          (vector-ref state 0) (vector-ref state 4) (vector-ref state 8) (vector-ref state 12)
-          (vector-ref state 1) (vector-ref state 5) (vector-ref state 9) (vector-ref state 13)
-          (vector-ref state 2) (vector-ref state 6) (vector-ref state 10) (vector-ref state 14)
-          (vector-ref state 3) (vector-ref state 7) (vector-ref state 11) (vector-ref state 15)))
+          (for ([c (in-vector state)])
+            (for ([v (in-bytes c)])
+              (printf "~x " v))
+            (printf "~n")))
 
 (define (printb ...)
   (printf "~b" ...))
@@ -64,34 +63,33 @@
 (check-equal? (mult #x57 3) (bitwise-xor #x57 #xae))
 (check-equal? (mult #x57 #x13) #xfe)
 
-(define (sub-bytes state)
-  (define new-state (vector-copy s))
+#;(define (sub-bytes state)
+  (define new-state (vector-copy s)))
 
 ; mix-columns : state -> state
 (define (mix-columns state)
-  (define new-state (vector-copy s))
-  (for ([c (in-range 4)])
-    (state-set! new-state 0 c
-                (bitwise-xor (mult (state-ref state 0 c) 2)
-                             (mult (state-ref state 1 c) 3)
-                             (state-ref state 2 c)
-                             (state-ref state 3 c)))
-    (state-set! new-state 1 c 
-                (bitwise-xor (mult (state-ref state 1 c) 2)
-                             (mult (state-ref state 2 c) 3)
-                             (state-ref state 0 c)
-                             (state-ref state 3 c)))
-    (state-set! new-state 2 c
-                (bitwise-xor (mult (state-ref state 2 c) 2)
-                             (mult (state-ref state 3 c) 3)
-                             (state-ref state 0 c)
-                             (state-ref state 1 c)))
-    (state-set! new-state 3 c
-                (bitwise-xor (mult (state-ref state 3 c) 2)
-                             (mult (state-ref state 0 c) 3)
-                             (state-ref state 1 c)
-                             (state-ref state 2 c))))
-  new-state)
+  (for/vector #:length (vector-length state)
+    ([c (in-vector state)])
+    (bytes
+     (bitwise-xor (mult (bytes-ref c 0) 2)
+                  (mult (bytes-ref c 1) 3)
+                  (bytes-ref c 2)
+                  (bytes-ref c 3))
+     
+     (bitwise-xor (mult (bytes-ref c 1) 2)
+                  (mult (bytes-ref c 2) 3)
+                  (bytes-ref c 0)
+                  (bytes-ref c 3))
+     
+     (bitwise-xor (mult (bytes-ref c 2) 2)
+                  (mult (bytes-ref c 3) 3)
+                  (bytes-ref c 0)
+                  (bytes-ref c 1))
+     
+     (bitwise-xor (mult (bytes-ref c 3) 2)
+                  (mult (bytes-ref c 0) 3)
+                  (bytes-ref c 1)
+                  (bytes-ref c 2)))))
 
-(define (cipher input)
-  (
+#;(define (cipher input)
+  ())
