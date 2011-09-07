@@ -1,4 +1,5 @@
 #lang racket
+(require rackunit)
 
 (define state (vector #xd4 #xbf #x5d #x30 
                       #xe0 #xb4 #x52 #xae
@@ -12,9 +13,6 @@
           (vector-ref s 2) (vector-ref s 6) (vector-ref s 10) (vector-ref s 14)
           (vector-ref s 3) (vector-ref s 7) (vector-ref s 11) (vector-ref s 15)))
 
-(define mx #x1b)
-(define num #x57)
-(define num2 #x13)
 (define (printb ...)
   (printf "~b" ...))
 (define (printx ...)
@@ -27,49 +25,47 @@
   (vector-set! s (+ (* c 4) r) v))
 
 ; xtime : num -> num
-; argument n is assumed to be < 16
-; performs a left shift followed by a conditional xor with #x1b
+; argument n is assumed to be < 16 (ie a byte)
+; performs a left shift followed by a conditional xor with #x11b
 (define (xtime n)
   (define intermediate (arithmetic-shift n 1))
   (if (> n 128)
       (bitwise-xor #x11b intermediate)
       intermediate))
 
-(define (apply-xtime num times)
-  (if (= times 1)
-      (xtime num)
-      (apply-xtime (xtime num) (sub1 times))))
-
-;prod is assumed to be either 2 or 3
-(define (weird-mult num prod)
-  (cond
-    [(= prod 2) (xtime num)]
-    [(= prod 3) (bitwise-xor num (xtime num))]
-    [else (print "unrecognized number!")]))
+(define (mult num prod)
+  (if (zero? prod) 0
+      (if (even? prod)
+          (mult (xtime num) (arithmetic-shift prod -1))
+          (bitwise-xor num (mult (xtime num) (arithmetic-shift prod -1))))))
+(check-equal? (mult #x57 0) 0)
+(check-equal? (mult #x57 1) #x57)
+(check-equal? (mult #x57 2) #xae)
+(check-equal? (mult #x57 3) (bitwise-xor #x57 #xae))
+(check-equal? (mult #x57 #x13) #xfe)
 
 ; mix-columns : state -> state
 (define (mix-columns s)
   (define new-state (vector-copy s))
   (for ([c (in-range 4)])
     (state-set! new-state 0 c
-                (bitwise-xor (weird-mult (state-ref s 0 c) 2)
-                             (weird-mult (state-ref s 1 c) 3)
+                (bitwise-xor (mult (state-ref s 0 c) 2)
+                             (mult (state-ref s 1 c) 3)
                              (state-ref s 2 c)
                              (state-ref s 3 c)))
     (state-set! new-state 1 c 
-                (bitwise-xor (weird-mult (state-ref s 1 c) 2)
-                             (weird-mult (state-ref s 2 c) 3)
+                (bitwise-xor (mult (state-ref s 1 c) 2)
+                             (mult (state-ref s 2 c) 3)
                              (state-ref s 0 c)
                              (state-ref s 3 c)))
     (state-set! new-state 2 c
-                (bitwise-xor (weird-mult (state-ref s 2 c) 2)
-                             (weird-mult (state-ref s 3 c) 3)
+                (bitwise-xor (mult (state-ref s 2 c) 2)
+                             (mult (state-ref s 3 c) 3)
                              (state-ref s 0 c)
                              (state-ref s 1 c)))
     (state-set! new-state 3 c
-                (bitwise-xor (weird-mult (state-ref s 3 c) 2)
-                             (weird-mult (state-ref s 0 c) 3)
+                (bitwise-xor (mult (state-ref s 3 c) 2)
+                             (mult (state-ref s 0 c) 3)
                              (state-ref s 1 c)
                              (state-ref s 2 c))))
   new-state)
-  
