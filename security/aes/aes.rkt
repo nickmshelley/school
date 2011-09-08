@@ -19,6 +19,24 @@
               #xE1 #xF8 #x98 #x11 #x69 #xD9 #x8E #x94 #x9B #x1E #x87 #xE9 #xCE #x55 #x28 #xDF
               #x8C #xA1 #x89 #x0D #xBF #xE6 #x42 #x68 #x41 #x99 #x2D #x0F #xB0 #x54 #xBB #x16))
 
+(define inverse-sbox (bytes
+                      #x52 #x09 #x6A #xD5 #x30 #x36 #xA5 #x38 #xBF #x40 #xA3 #x9E #x81 #xF3 #xD7 #xFB
+                      #x7C #xE3 #x39 #x82 #x9B #x2F #xFF #x87 #x34 #x8E #x43 #x44 #xC4 #xDE #xE9 #xCB
+                      #x54 #x7B #x94 #x32 #xA6 #xC2 #x23 #x3D #xEE #x4C #x95 #x0B #x42 #xFA #xC3 #x4E
+                      #x08 #x2E #xA1 #x66 #x28 #xD9 #x24 #xB2 #x76 #x5B #xA2 #x49 #x6D #x8B #xD1 #x25
+                      #x72 #xF8 #xF6 #x64 #x86 #x68 #x98 #x16 #xD4 #xA4 #x5C #xCC #x5D #x65 #xB6 #x92
+                      #x6C #x70 #x48 #x50 #xFD #xED #xB9 #xDA #x5E #x15 #x46 #x57 #xA7 #x8D #x9D #x84
+                      #x90 #xD8 #xAB #x00 #x8C #xBC #xD3 #x0A #xF7 #xE4 #x58 #x05 #xB8 #xB3 #x45 #x06
+                      #xD0 #x2C #x1E #x8F #xCA #x3F #x0F #x02 #xC1 #xAF #xBD #x03 #x01 #x13 #x8A #x6B
+                      #x3A #x91 #x11 #x41 #x4F #x67 #xDC #xEA #x97 #xF2 #xCF #xCE #xF0 #xB4 #xE6 #x73
+                      #x96 #xAC #x74 #x22 #xE7 #xAD #x35 #x85 #xE2 #xF9 #x37 #xE8 #x1C #x75 #xDF #x6E
+                      #x47 #xF1 #x1A #x71 #x1D #x29 #xC5 #x89 #x6F #xB7 #x62 #x0E #xAA #x18 #xBE #x1B
+                      #xFC #x56 #x3E #x4B #xC6 #xD2 #x79 #x20 #x9A #xDB #xC0 #xFE #x78 #xCD #x5A #xF4
+                      #x1F #xDD #xA8 #x33 #x88 #x07 #xC7 #x31 #xB1 #x12 #x10 #x59 #x27 #x80 #xEC #x5F
+                      #x60 #x51 #x7F #xA9 #x19 #xB5 #x4A #x0D #x2D #xE5 #x7A #x9F #x93 #xC9 #x9C #xEF
+                      #xA0 #xE0 #x3B #x4D #xAE #x2A #xF5 #xB0 #xC8 #xEB #xBB #x3C #x83 #x53 #x99 #x61
+                      #x17 #x2B #x04 #x7E #xBA #x77 #xD6 #x26 #xE1 #x69 #x14 #x63 #x55 #x21 #x0C #x7D))
+
 (define rcon (bytes
               #x01 #x02 #x04 #x08 
               #x10 #x20 #x40 #x80 
@@ -69,23 +87,23 @@
 (check-equal? (mult #x57 3) (bitwise-xor #x57 #xae))
 (check-equal? (mult #x57 #x13) #xfe)
 
-(define (substitute val)
-  (bytes-ref sbox (+ (* (arithmetic-shift val -4) 16) (modulo val 16))))
-(check-equal? (substitute 0) #x63)
-(check-equal? (substitute #x3a) #x80)
+(define (substitute val sub-array)
+  (bytes-ref sub-array (+ (* (arithmetic-shift val -4) 16) (modulo val 16))))
+(check-equal? (substitute 0 sbox) #x63)
+(check-equal? (substitute #x3a sbox) #x80)
 
-(define (sub-word word)
+(define (sub-word word sub-array)
   (list->bytes 
    (for/list ([v (in-bytes word)])
-     (substitute v))))
+     (substitute v sub-array))))
 
-(define (sub-bytes state)
+(define (sub-bytes state sub-array)
   (for/vector ([c (in-vector state)])
-    (sub-word c)))
+    (sub-word c sub-array)))
 (check-equal? (sub-bytes (vector (bytes #x19 #x3d #xe3 #xbe)
                                  (bytes #xa0 #xf4 #xe2 #x2b)
                                  (bytes #x9a #xc6 #x8d #x2a)
-                                 (bytes #xe9 #xf8 #x48 #x08)))
+                                 (bytes #xe9 #xf8 #x48 #x08)) sbox)
               (vector (bytes #xd4 #x27 #x11 #xae)
                       (bytes #xe0 #xbf #x98 #xf1)
                       (bytes #xb8 #xb4 #x5d #xe5)
@@ -178,7 +196,7 @@
   (define key-length (vector-length key))
   (define num-rounds (+ key-length 6))
   (for/fold ([vec key])
-    ([i (in-range (* 4 num-rounds))])
+    ([i (in-range (- (* 4 (add1 num-rounds)) key-length))])
     (define temp (vector-ref vec (sub1 (vector-length vec))))
     (vector-append 
      vec
@@ -187,66 +205,66 @@
        (vector-ref vec i)
        (cond
          [(= (modulo i key-length) 0) 
-          (xor-word (sub-word (rotate-word temp)) (bytes (bytes-ref rcon (/ i key-length)) 0 0 0))]
+          (xor-word (sub-word (rotate-word temp) sbox) (bytes (bytes-ref rcon (/ i key-length)) 0 0 0))]
          [(and (> key-length 6) (= (modulo i key-length) 4))
-          (sub-word temp)]
+          (sub-word temp sbox)]
          [else temp]))))))
 
 (define (cipher input key)
   (define num-rounds (+ (vector-length key) 6))
   (define w-init (key-expand key))
-;  (printf "~nround key:~n") 
-;  (print-state (vector-take w-init 4))
-;  (printf "~nstate:~n")
-;  (print-state (add-round-key input (vector-take w-init 4)))
+  ;    (printf "~nround key:~n") 
+  ;    (print-state (vector-take-right w-init 4))
+  ;  (printf "~nstate:~n")
+  ;  (print-state (add-round-key input (vector-take w-init 4)))
   (define-values
     (w-out state-out)
     (for/fold ([w (vector-take-right w-init (- (vector-length w-init) 4))]
                [state (add-round-key input (vector-take w-init 4))])
       ([i (in-range (sub1 num-rounds))])
-;      (printf "~nsub bytes:~n") 
-;      (print-state (sub-bytes state))
-;      (printf "~nshift rows:~n")
-;      (print-state (shift-rows (sub-bytes state)))
-;      (printf "~nmix columns:~n")
-;      (print-state (mix-columns (shift-rows (sub-bytes state))))
-;      (printf "~nround key:~n")
-;      (print-state (vector-take w 4))
-;      (printf "~nstate:~n")
-;      (print-state (add-round-key (mix-columns (shift-rows (sub-bytes state)))
-;                                  (vector-take w 4)))
+      ;      (printf "~nsub bytes:~n") 
+      ;      (print-state (sub-bytes state))
+      ;      (printf "~nshift rows:~n")
+      ;      (print-state (shift-rows (sub-bytes state)))
+      ;      (printf "~nmix columns:~n")
+      ;      (print-state (mix-columns (shift-rows (sub-bytes state))))
+      ;      (printf "~nround key:~n")
+      ;      (print-state (vector-take w 4))
+      ;      (printf "~nstate:~n")
+      ;      (print-state (add-round-key (mix-columns (shift-rows (sub-bytes state)))
+      ;                                  (vector-take w 4)))
       (values 
        (vector-take-right w (- (vector-length w) 4))
-       (add-round-key (mix-columns (shift-rows (sub-bytes state)))
+       (add-round-key (mix-columns (shift-rows (sub-bytes state sbox)))
                       (vector-take w 4)))))
-  (add-round-key (shift-rows (sub-bytes state-out))
+  (add-round-key (shift-rows (sub-bytes state-out sbox))
                  w-out))
 
 (check-equal? (cipher (vector (bytes #x32 #x43 #xf6 #xa8) ;input
-                                (bytes #x88 #x5a #x30 #x8d)
-                                (bytes #x31 #x31 #x98 #xa2)
-                                (bytes #xe0 #x37 #x07 #x34))
-                        (vector (bytes #x2b #x7e #x15 #x16) ;key
-                                (bytes #x28 #xae #xd2 #xa6)
-                                (bytes #xab #xf7 #x15 #x88)
-                                (bytes #x09 #xcf #x4f #x3c)))
-                (vector (bytes #x39 #x25 #x84 #x1d)
-                        (bytes #x02 #xdc #x09 #xfb)
-                        (bytes #xdc #x11 #x85 #x97)
-                        (bytes #x19 #x6a #x0b #x32)))
+                              (bytes #x88 #x5a #x30 #x8d)
+                              (bytes #x31 #x31 #x98 #xa2)
+                              (bytes #xe0 #x37 #x07 #x34))
+                      (vector (bytes #x2b #x7e #x15 #x16) ;key
+                              (bytes #x28 #xae #xd2 #xa6)
+                              (bytes #xab #xf7 #x15 #x88)
+                              (bytes #x09 #xcf #x4f #x3c)))
+              (vector (bytes #x39 #x25 #x84 #x1d)
+                      (bytes #x02 #xdc #x09 #xfb)
+                      (bytes #xdc #x11 #x85 #x97)
+                      (bytes #x19 #x6a #x0b #x32)))
 
 (check-equal? (cipher (vector (bytes #x00 #x11 #x22 #x33)
-                                (bytes #x44 #x55 #x66 #x77)
-                                (bytes #x88 #x99 #xaa #xbb)
-                                (bytes #xcc #xdd #xee #xff))
-                        (vector (bytes #x00 #x01 #x02 #x03)
-                                (bytes #x04 #x05 #x06 #x07)
-                                (bytes #x08 #x09 #x0a #x0b)
-                                (bytes #x0c #x0d #x0e #x0f)))
-                (vector (bytes #x69 #xc4 #xe0 #xd8)
-                        (bytes #x6a #x7b #x04 #x30)
-                        (bytes #xd8 #xcd #xb7 #x80)
-                        (bytes #x70 #xb4 #xc5 #x5a)))
+                              (bytes #x44 #x55 #x66 #x77)
+                              (bytes #x88 #x99 #xaa #xbb)
+                              (bytes #xcc #xdd #xee #xff))
+                      (vector (bytes #x00 #x01 #x02 #x03)
+                              (bytes #x04 #x05 #x06 #x07)
+                              (bytes #x08 #x09 #x0a #x0b)
+                              (bytes #x0c #x0d #x0e #x0f)))
+              (vector (bytes #x69 #xc4 #xe0 #xd8)
+                      (bytes #x6a #x7b #x04 #x30)
+                      (bytes #xd8 #xcd #xb7 #x80)
+                      (bytes #x70 #xb4 #xc5 #x5a)))
 
 (check-equal? (cipher (vector (bytes #x00 #x11 #x22 #x33)
                               (bytes #x44 #x55 #x66 #x77)
@@ -280,4 +298,108 @@
                       (bytes #xea #xfc #x49 #x90)
                       (bytes #x4b #x49 #x60 #x89)))
 
+(define (inverse-shift-rows state)
+  (for/vector ([i (in-range (vector-length state))])
+    (bytes
+     (state-ref state 0 i)
+     (state-ref state 1 (modulo (- i 1) 4))
+     (state-ref state 2 (modulo (- i 2) 4))
+     (state-ref state 3 (modulo (- i 3) 4)))))
 
+(define (inverse-mix-columns state)
+  (for/vector #:length (vector-length state)
+    ([c (in-vector state)])
+    (bytes
+     (bitwise-xor (mult (bytes-ref c 0) #xe)
+                  (mult (bytes-ref c 1) #xb)
+                  (mult (bytes-ref c 2) #xd)
+                  (mult (bytes-ref c 3) #x9))
+     (bitwise-xor (mult (bytes-ref c 0) #x9)
+                  (mult (bytes-ref c 1) #xe)
+                  (mult (bytes-ref c 2) #xb)
+                  (mult (bytes-ref c 3) #xd))
+     (bitwise-xor (mult (bytes-ref c 0) #xd)
+                  (mult (bytes-ref c 1) #x9)
+                  (mult (bytes-ref c 2) #xe)
+                  (mult (bytes-ref c 3) #xb))
+     (bitwise-xor (mult (bytes-ref c 0) #xb)
+                  (mult (bytes-ref c 1) #xd)
+                  (mult (bytes-ref c 2) #x9)
+                  (mult (bytes-ref c 3) #xe)))))
+
+(define (inverse-cipher input key)
+  (define num-rounds (+ (vector-length key) 6))
+  (define w-init (key-expand key))
+  ;  (printf "vector length: ~a~n" (vector-length w-init))
+  ;  (printf "~nround key:~n") 
+  ;  (print-state (vector-take-right w-init 4))
+  ;  (printf "~nstate:~n")
+  ;  (print-state (add-round-key input (vector-take-right w-init 4)))
+  (define-values
+    (w-out state-out)
+    (for/fold ([w (vector-take w-init (- (vector-length w-init) 4))]
+               [state (add-round-key input (vector-take-right w-init 4))])
+      ([i (in-range (sub1 num-rounds))])
+      ;      (printf "~nshift rows:~n")
+      ;      (print-state (inverse-shift-rows state))
+      ;      (printf "~nsub bytes:~n")
+      ;      (print-state (sub-bytes (inverse-shift-rows state) inverse-sbox))
+      ;      (printf "~nround key:~n")
+      ;      (print-state (vector-take-right w 4))
+      ;      (printf "~nadd round key:~n")
+      ;      (print-state (add-round-key (sub-bytes (inverse-shift-rows state) inverse-sbox)
+      ;                                  (vector-take-right w 4)))
+      ;      (printf "~nmix columns:~n")
+      ;      (print-state (inverse-mix-columns (add-round-key (sub-bytes (inverse-shift-rows state) inverse-sbox)
+      ;                                                       (vector-take-right w 4))))
+      (values 
+       (vector-take w (- (vector-length w) 4))
+       (inverse-mix-columns (add-round-key (sub-bytes (inverse-shift-rows state) inverse-sbox)
+                                           (vector-take-right w 4))))))
+  (add-round-key (sub-bytes (inverse-shift-rows state-out) inverse-sbox)
+                 w-out))
+
+(check-equal? (inverse-cipher (vector (bytes #x69 #xc4 #xe0 #xd8)
+                                      (bytes #x6a #x7b #x04 #x30)
+                                      (bytes #xd8 #xcd #xb7 #x80)
+                                      (bytes #x70 #xb4 #xc5 #x5a))
+                              (vector (bytes #x00 #x01 #x02 #x03)
+                                      (bytes #x04 #x05 #x06 #x07)
+                                      (bytes #x08 #x09 #x0a #x0b)
+                                      (bytes #x0c #x0d #x0e #x0f)))
+              (vector (bytes #x00 #x11 #x22 #x33)
+                      (bytes #x44 #x55 #x66 #x77)
+                      (bytes #x88 #x99 #xaa #xbb)
+                      (bytes #xcc #xdd #xee #xff)))
+
+(check-equal? (inverse-cipher (vector (bytes #xdd #xa9 #x7c #xa4)
+                                      (bytes #x86 #x4c #xdf #xe0)
+                                      (bytes #x6e #xaf #x70 #xa0)
+                                      (bytes #xec #x0d #x71 #x91))
+                              (vector (bytes #x00 #x01 #x02 #x03)
+                                      (bytes #x04 #x05 #x06 #x07)
+                                      (bytes #x08 #x09 #x0a #x0b)
+                                      (bytes #x0c #x0d #x0e #x0f)
+                                      (bytes #x10 #x11 #x12 #x13)
+                                      (bytes #x14 #x15 #x16 #x17)))
+              (vector (bytes #x00 #x11 #x22 #x33)
+                      (bytes #x44 #x55 #x66 #x77)
+                      (bytes #x88 #x99 #xaa #xbb)
+                      (bytes #xcc #xdd #xee #xff)))
+
+(check-equal? (inverse-cipher (vector (bytes #x8e #xa2 #xb7 #xca)
+                                      (bytes #x51 #x67 #x45 #xbf)
+                                      (bytes #xea #xfc #x49 #x90)
+                                      (bytes #x4b #x49 #x60 #x89))
+                              (vector (bytes #x00 #x01 #x02 #x03)
+                                      (bytes #x04 #x05 #x06 #x07)
+                                      (bytes #x08 #x09 #x0a #x0b)
+                                      (bytes #x0c #x0d #x0e #x0f)
+                                      (bytes #x10 #x11 #x12 #x13)
+                                      (bytes #x14 #x15 #x16 #x17)
+                                      (bytes #x18 #x19 #x1a #x1b)
+                                      (bytes #x1c #x1d #x1e #x1f)))
+              (vector (bytes #x00 #x11 #x22 #x33)
+                      (bytes #x44 #x55 #x66 #x77)
+                      (bytes #x88 #x99 #xaa #xbb)
+                      (bytes #xcc #xdd #xee #xff)))
