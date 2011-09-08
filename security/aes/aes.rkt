@@ -19,6 +19,21 @@
               #xE1 #xF8 #x98 #x11 #x69 #xD9 #x8E #x94 #x9B #x1E #x87 #xE9 #xCE #x55 #x28 #xDF
               #x8C #xA1 #x89 #x0D #xBF #xE6 #x42 #x68 #x41 #x99 #x2D #x0F #xB0 #x54 #xBB #x16))
 
+(define rcon (bytes
+              #x01 #x02 #x04 #x08 
+              #x10 #x20 #x40 #x80 
+              #x1B #x36 #x6C #xD8 
+              #xAB #x4D #x9A #x2F 
+              #x5E #xBC #x63 #xC6 
+              #x97 #x35 #x6A #xD4 
+              #xB3 #x7D #xFA #xEF 
+              #xC5 #x91 #x39 #x72 
+              #xE4 #xD3 #xBD #x61 
+              #xC2 #x9F #x25 #x4A 
+              #x94 #x33 #x66 #xCC 
+              #x83 #x1D #x3A #x74 
+              #xE8 #xCB #x8D))
+
 (define (state-ref state r c)
   (bytes-ref (vector-ref state c) r))
 
@@ -59,11 +74,14 @@
 (check-equal? (substitute 0) #x63)
 (check-equal? (substitute #x3a) #x80)
 
+(define (sub-word word)
+  (list->bytes 
+   (for/list ([v (in-bytes word)])
+     (substitute v))))
+
 (define (sub-bytes state)
   (for/vector ([c (in-vector state)])
-    (list->bytes 
-     (for/list ([v (in-bytes c)])
-       (substitute v)))))
+    (sub-word c)))
 (check-equal? (sub-bytes (vector (bytes #x19 #x3d #xe3 #xbe)
                                  (bytes #xa0 #xf4 #xe2 #x2b)
                                  (bytes #x9a #xc6 #x8d #x2a)
@@ -121,21 +139,92 @@
      (for/list ([state-val (in-bytes state-col)]
                 [key-val (in-bytes key-col)])
        (bitwise-xor key-val state-val)))))
-(check-equal? (
+(check-equal? (add-round-key 
+               (vector (bytes #x32 #x43 #xf6 #xa8) ;input
+                       (bytes #x88 #x5a #x30 #x8d)
+                       (bytes #x31 #x31 #x98 #xa2)
+                       (bytes #xe0 #x37 #x07 #x34))
+               (vector (bytes #x2b #x7e #x15 #x16) ;key
+                       (bytes #x28 #xae #xd2 #xa6)
+                       (bytes #xab #xf7 #x15 #x88)
+                       (bytes #x09 #xcf #x4f #x3c)))
+              (vector (bytes #x19 #x3d #xe3 #xbe)
+                      (bytes #xa0 #xf4 #xe2 #x2b)
+                      (bytes #x9a #xc6 #x8d #x2a)
+                      (bytes #xe9 #xf8 #x48 #x08)))
+
+(define (rotate-word word)
+  (list->bytes
+   (for/list ([i (in-range (bytes-length word))])
+     (bytes-ref word (modulo (add1 i) (bytes-length word))))))
+(check-equal? (rotate-word (bytes 1 2 3 4)) (bytes 2 3 4 1))
+
+(define (xor-word word1 word2)
+  (list->bytes
+   (for/list ([i (in-range (bytes-length word1))])
+     (bitwise-xor (bytes-ref word1 i) (bytes-ref word2 i)))))
+(check-equal? (xor-word (bytes #xa0 #xfa #xfe #x17) (bytes #x28 #xae #xd2 #xa6))
+              (bytes #x88 #x54 #x2c #xb1))
 
 ;key-expand : vector -> vector
 ;takes a key (as a vector of bytes) and returns an expanded vector of bytes (w array in spec)
-#;(define (key-expand key)
-    (define num-rounds (+ (vector-length key) 6))
-    (vector-append
-     key
-     (for/vector )))
+(define (key-expand key)
+  (define key-length (vector-length key))
+  (define num-rounds (+ key-length 6))
+  (for/fold ([vec key])
+    ([i (in-range (* 4 num-rounds))])
+    (define temp (vector-ref vec (sub1 (vector-length vec))))
+    (vector-append 
+     vec
+     (vector 
+      (xor-word 
+       (vector-ref vec i)
+       (cond
+         [(= (modulo i key-length) 0) 
+          (xor-word (sub-word (rotate-word temp)) (bytes (bytes-ref rcon (/ i key-length)) 0 0 0))]
+         [(and (> key-length 6) (= (modulo i key-length) 4))
+          (sub-word temp)]
+         [else temp]))))))
 
 (define (cipher input key)
-  (define w (key-expand key))
-  (sub-bytes input))
+  (define num-rounds (+ (vector-length key) 6))
+  (define w-init (key-expand key))
+;  (printf "~nround key:~n") 
+;  (print-state (vector-take w-init 4))
+;  (printf "~nstate:~n")
+;  (print-state (add-round-key input (vector-take w-init 4)))
+  (define-values
+    (w-out state-out)
+    (for/fold ([w (vector-take-right w-init (- (vector-length w-init) 4))]
+               [state (add-round-key input (vector-take w-init 4))])
+      ([i (in-range (sub1 num-rounds))])
+      ;      (printf "~nstate:~n") 
+      ;      (print-state (sub-bytes state))
+      ;      (printf "~nstate:~n")
+      ;      (print-state (shift-rows (sub-bytes state)))
+      ;      (printf "~nstate:~n")
+      ;      (print-state (mix-columns (shift-rows (sub-bytes state))))
+      ;      (printf "~nround key:~n")
+      ;      (print-state (vector-take w 4))
+      ;      (printf "~nstate:~n")
+      ;      (print-state (add-round-key (mix-columns (shift-rows (sub-bytes state)))
+      ;                                  (vector-take w 4)))
+      (values 
+       (vector-take-right w (- (vector-length w) 4))
+       (add-round-key (mix-columns (shift-rows (sub-bytes state)))
+                      (vector-take w 4)))))
+  (add-round-key (shift-rows (sub-bytes state-out))
+                 w-out))
 
-(cipher (vector (bytes #xd4 #xbf #x5d #x30)
-                (bytes #xe0 #xb4 #x52 #xae)
-                (bytes #xb8 #x41 #x11 #xf1)
-                (bytes #x1e #x27 #x98 #xe5)))
+(check-equal? (cipher (vector (bytes #x32 #x43 #xf6 #xa8) ;input
+                                (bytes #x88 #x5a #x30 #x8d)
+                                (bytes #x31 #x31 #x98 #xa2)
+                                (bytes #xe0 #x37 #x07 #x34))
+                        (vector (bytes #x2b #x7e #x15 #x16) ;key
+                                (bytes #x28 #xae #xd2 #xa6)
+                                (bytes #xab #xf7 #x15 #x88)
+                                (bytes #x09 #xcf #x4f #x3c)))
+                (vector (bytes #x39 #x25 #x84 #x1d)
+                        (bytes #x02 #xdc #x09 #xfb)
+                        (bytes #xdc #x11 #x85 #x97)
+                        (bytes #x19 #x6a #x0b #x32)))
