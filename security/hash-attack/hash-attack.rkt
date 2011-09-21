@@ -35,10 +35,16 @@
       (yield word)
       (loop (next-word word)))))
 
-(for* ([size (in-naturals 1)]
-       [str (in-producer (make-generator size) #f)])
-  (printf "~a~n" str #;(sha1 (open-input-string str))))
+(define (collision-attack digits)
+  (define results (make-hash))
+  (for* ([size (in-naturals 1)]
+         [str (in-producer (make-generator size) #f)])
+    (define result (hash-ref! results (substring (sha1 (open-input-string str)) 0 digits) str))
+    (when (not (string=? result str)) (error 'collision-found "~a and ~a collided; hashes were:~n~a~n~a~nAttack took ~a steps"
+                                             result str (sha1 (open-input-string result)) (sha1 (open-input-string str)) (length (hash-keys results))))))
 
-(test)
+(collision-attack 5)
+
+;(test)
 
 
