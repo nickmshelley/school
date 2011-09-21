@@ -3,8 +3,6 @@
          racket/generator
          test-engine/racket-tests)
 
-(sha1 (open-input-string "hi"))
-
 (define (next-word current-word)
   (if (string=? current-word (make-string (string-length current-word) #\z))
       #f
@@ -31,13 +29,15 @@
 (check-expect (next-word "afzzz") "agaaa")
 (check-expect (next-word "zzz") #f)
 
-(define g (generator (size)
-            (let loop ([word (make-string size #\a)])
-              (yield word)
-              (loop (next-word word)))))
+(define (make-generator size) 
+  (generator ()
+    (let loop ([word (make-string size #\a)])
+      (yield word)
+      (loop (next-word word)))))
 
-(for ([i (in-producer g #f 2)])
-  (printf "~a~n" i))
+(for* ([size (in-naturals 1)]
+       [str (in-producer (make-generator size) #f)])
+  (printf "~a~n" str #;(sha1 (open-input-string str))))
 
 (test)
 
