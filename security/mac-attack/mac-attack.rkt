@@ -56,21 +56,21 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   (if (<= bits 448)
       1
       (let* ((full-blocks (+ 1 (quotient bits 512)))
-	     (rest (- (* full-blocks 512) bits)))
-	(if (< rest 64)
-	    (+ 1 full-blocks)
-	    full-blocks))))
+             (rest (- (* full-blocks 512) bits)))
+        (if (< rest 64)
+            (+ 1 full-blocks)
+            full-blocks))))
 
 ;;; convert NUM-BYTES from BV (starting at START) into an integer
 (define (bytes->block bv start num-bytes)
   (let lp ((i 0) (block 0))
     (if (= i num-bytes)
-	block
-	(lp (+ i 1) 
-	    (bitwise-ior 
-	     block
-	     (arithmetic-shift (bytes-ref bv (+ start i))
-			       (* 8 (- num-bytes (+ i 1)))))))))
+        block
+        (lp (+ i 1) 
+            (bitwise-ior 
+             block
+             (arithmetic-shift (bytes-ref bv (+ start i))
+                               (* 8 (- num-bytes (+ i 1)))))))))
 
 ;;; enough space for 64 bit length info?
 (define (enough-space-for-length-info? last-block-len)
@@ -84,46 +84,46 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (define (prepare-message! blocks unused-bits total-message-len)
   (let* ((len (vector-length blocks))
-	 (spare-block-index (- len 1))
-	 (last-block-index (- len 2))
-	 (last-block (vector-ref blocks last-block-index)))
-   (cond
-    ((>= unused-bits (+ 64 1))
-     ;; there is enough space to store the message length in the last
-     ;; block
-     (vector-set! blocks
-		  last-block-index
-		  ;(+ (pad-block last-block 512) total-message-len))
-		  (+ (pad-block last-block unused-bits) total-message-len))
-     last-block-index)
-    ((zero? unused-bits)
-     ;; we need the spare block.  There is no space to pad the last
-     ;; block.
-     (vector-set! blocks
-		  spare-block-index
-		  ;(+ (pad-block 0 512) total-message-len))
-		  (+ (pad-block 0 unused-bits) total-message-len))
-     spare-block-index)
-    (else
-     ;; we need the spare block. First pad the last-block to 512 bits
-     (vector-set! blocks
-		  last-block-index
-		  ;(pad-block last-block 512))
-		  (pad-block last-block unused-bits))
-     ;; Now write the length into the spare block
-     (vector-set! blocks spare-block-index total-message-len)
-     spare-block-index))))
+         (spare-block-index (- len 1))
+         (last-block-index (- len 2))
+         (last-block (vector-ref blocks last-block-index)))
+    (cond
+      ((>= unused-bits (+ 64 1))
+       ;; there is enough space to store the message length in the last
+       ;; block
+       (vector-set! blocks
+                    last-block-index
+                    ;(+ (pad-block last-block 512) total-message-len))
+                    (+ (pad-block last-block unused-bits) total-message-len))
+       last-block-index)
+      ((zero? unused-bits)
+       ;; we need the spare block.  There is no space to pad the last
+       ;; block.
+       (vector-set! blocks
+                    spare-block-index
+                    ;(+ (pad-block 0 512) total-message-len))
+                    (+ (pad-block 0 unused-bits) total-message-len))
+       spare-block-index)
+      (else
+       ;; we need the spare block. First pad the last-block to 512 bits
+       (vector-set! blocks
+                    last-block-index
+                    ;(pad-block last-block 512))
+                    (pad-block last-block unused-bits))
+       ;; Now write the length into the spare block
+       (vector-set! blocks spare-block-index total-message-len)
+       spare-block-index))))
 
 ;;; generate a vector with masks that decompose a 512-bit block into
 ;;; 16 32-bit words (stored in a vector)
 (define (make-split-block-vector)
   (let ((vec (make-vector 16 0)))
     (do ((i 0 (+ i 32))
-	 (j 0 (+ j 1)))
-	((>= i 512) vec)
+         (j 0 (+ j 1)))
+      ((>= i 512) vec)
       (vector-set! vec
-		   j
-		   (make-extract-mask i 32)))))
+                   j
+                   (make-extract-mask i 32)))))
 
 (define split-block-masks
   (make-split-block-vector))
@@ -133,57 +133,57 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (define (split-block block)
   (let ((vec (make-vector 16 0)))
     (do ((i 0 (+ i 1)))
-	((>= i 16) vec)
+      ((>= i 16) vec)
       (vector-set! 
        vec (- 15 i)
        (arithmetic-shift
-	(bitwise-and (vector-ref split-block-masks i)
-		     block)
-	(- (* i 32)))))))
+        (bitwise-and (vector-ref split-block-masks i)
+                     block)
+        (- (* i 32)))))))
 
 ;;; extend a vector with 16 32-bit words into a vector of 80 32-bit
 ;;; words
 (define (extend-word-blocks word-block)
   (let ((vec (make-vector 80 0)))
-
+    
     (do ((i 0 (+ i 1)))
-	((> i 15) (values))
+      ((> i 15) (values))
       (vector-set! vec i (vector-ref word-block i)))
-
+    
     (do ((i 16 (+ i 1)))
-	((> i 79) vec)
+      ((> i 79) vec)
       (vector-set! 
        vec i
        (circular-shift-left
-	(bitwise-xor (vector-ref vec (- i 3))
-		     (bitwise-xor (vector-ref vec (- i 8))
-				  (bitwise-xor (vector-ref vec (- i 14))
-					       (vector-ref vec (- i 16)))))
-	1)))))
+        (bitwise-xor (vector-ref vec (- i 3))
+                     (bitwise-xor (vector-ref vec (- i 8))
+                                  (bitwise-xor (vector-ref vec (- i 14))
+                                               (vector-ref vec (- i 16)))))
+        1)))))
 
 ;;; the nonlinear functions used by SHA1
 (define (nonlinear-sha1-function i x y z)
   (cond
-   ((<= i 19)
-    (bitwise-xor (bitwise-and x y) 
-		 (bitwise-and (bitwise-not x) z)))
-   ((<= i 39)
-    (bitwise-xor (bitwise-xor x y) z))
-   ((<= i 59)
-    (bitwise-xor
-     (bitwise-xor (bitwise-and x y)
-		  (bitwise-and x z))
-     (bitwise-and y z)))
-   (else
-    (bitwise-xor (bitwise-xor x y) z))))
+    ((<= i 19)
+     (bitwise-xor (bitwise-and x y) 
+                  (bitwise-and (bitwise-not x) z)))
+    ((<= i 39)
+     (bitwise-xor (bitwise-xor x y) z))
+    ((<= i 59)
+     (bitwise-xor
+      (bitwise-xor (bitwise-and x y)
+                   (bitwise-and x z))
+      (bitwise-and y z)))
+    (else
+     (bitwise-xor (bitwise-xor x y) z))))
 
 ;;; the SHA1 "constants"
 (define (sha1-constant i)
   (cond
-   ((<= i 19) #x5a827999)
-   ((<= i 39) #x6ed9eba1)
-   ((<= i 59) #x8f1bbcdc)
-   (else #xca62c1d6)))
+    ((<= i 19) #x5a827999)
+    ((<= i 39) #x6ed9eba1)
+    ((<= i 59) #x8f1bbcdc)
+    (else #xca62c1d6)))
 
 ;;; append five 32 bits to a 160 bit hash number
 (define (append-hash h0 h1 h2 h3 h4)
@@ -199,30 +199,30 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (define (sha1-loop extended-words h0 h1 h2 h3 h4)
   (let lp ((i 0) (a h0) (b h1) (c h2) (d h3) (e h4))
     (if (= i 80)
-	(values a b c d e)
-	(lp (+ i 1)
-	    (mod5+ (circular-shift-left a 5)
-		   (nonlinear-sha1-function i b c d)
-		   e
-		   (vector-ref extended-words i)
-		   (sha1-constant i))
-	    a
-	    (circular-shift-left b 30)
-	    c
-	    d))))
+        (values a b c d e)
+        (lp (+ i 1)
+            (mod5+ (circular-shift-left a 5)
+                   (nonlinear-sha1-function i b c d)
+                   e
+                   (vector-ref extended-words i)
+                   (sha1-constant i))
+            a
+            (circular-shift-left b 30)
+            c
+            d))))
 
 (define (calculate-sha1 blocks last-index)
   (let lp #;((index 0)
-	   (h0 #x67452301) (h1 #xefcdab89) (h2 #x98badcfe)
-	   (h3 #x10325476) (h4 #xc3d2e1f0))
+             (h0 #x67452301) (h1 #xefcdab89) (h2 #x98badcfe)
+             (h3 #x10325476) (h4 #xc3d2e1f0))
     ((index 0)
-	   (h0 #xf4b645e8) (h1 #x9faaec2f) (h2 #xf8e443c5)
-	   (h3 #x95009c16) (h4 #xdbdfba4b))
+     (h0 #xf4b645e8) (h1 #x9faaec2f) (h2 #xf8e443c5)
+     (h3 #x95009c16) (h4 #xdbdfba4b))
     (if (> index last-index)
-	(append-hash h0 h1 h2 h3 h4)
-	(let* ((block (vector-ref blocks index))
-	       (word-blocks (split-block block))
-	       (extended-words (extend-word-blocks word-blocks)))
+        (append-hash h0 h1 h2 h3 h4)
+        (let* ((block (vector-ref blocks index))
+               (word-blocks (split-block block))
+               (extended-words (extend-word-blocks word-blocks)))
           (let-values ([(a b c d e)
                         (sha1-loop extended-words h0 h1 h2 h3 h4)])
             (let ((h0 (mod2+ h0 a))
@@ -236,17 +236,17 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;; number of unused bits in the last block.
 (define (byte-string->blocks bv)
   (let* ((bytes (bytes-length bv))
-	 (vec (make-vector (+ 1 (+ 1 (quotient bytes (quotient 512 8)))) 0))
-	 (bits 0))
+         (vec (make-vector (+ 1 (+ 1 (quotient bytes (quotient 512 8)))) 0))
+         (bits 0))
     ;; the last element is a spare element---just needed if the
     ;; message length doesn't fit into the last message block.
     (do ((i 0 (+ i 64))
-	 (j 0 (+ j 1)))
-	((> (+ i 64) bytes)
-	 (vector-set! vec j (bytes->block bv i (- bytes i)))
-	 (values vec 
-		 (* 8 (- 64 (- bytes i))) 
-		 (+ bits (* 8 (- bytes i)))))
+         (j 0 (+ j 1)))
+      ((> (+ i 64) bytes)
+       (vector-set! vec j (bytes->block bv i (- bytes i)))
+       (values vec 
+               (* 8 (- 64 (- bytes i))) 
+               (+ bits (* 8 (- bytes i)))))
       (set! bits (+ bits 512))
       (vector-set! vec j (bytes->block bv i 64)))))
 
@@ -261,10 +261,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (define (make-hash-as-bytes-mask)
   (let* ((len (quotient 160 8))
-	 (vec (make-vector len 0)))
+         (vec (make-vector len 0)))
     (do ((i 0 (+ i 8))
-	 (j 0 (+ j 1)))
-	((>= i 160) vec)
+         (j 0 (+ j 1)))
+      ((>= i 160) vec)
       (vector-set! vec j (make-extract-mask i 8)))))
 
 (define hash-as-bytes-masks
@@ -272,15 +272,15 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (define (hash-value->bytes int)
   (let* ((len (vector-length hash-as-bytes-masks))
- 	 (bv (make-bytes len 0)))
-     (do ((i 0 (+ i 1)))
-         ((>= i len) bv)
-       (bytes-set!
-        bv (- (- len 1) i)
-	(arithmetic-shift
-	 (bitwise-and (vector-ref hash-as-bytes-masks i)
-		      int)
-	 (- (* i 8)))))))
+         (bv (make-bytes len 0)))
+    (do ((i 0 (+ i 1)))
+      ((>= i len) bv)
+      (bytes-set!
+       bv (- (- len 1) i)
+       (arithmetic-shift
+        (bitwise-and (vector-ref hash-as-bytes-masks i)
+                     int)
+        (- (* i 8)))))))
 
 (define (sha1-input in)
   (let ([p (open-output-bytes)]
@@ -315,3 +315,18 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;; The above was copied and pasted and slightly modified by my
 
 (define m1-size (+ (* 47 8) 128))
+(define m1-bytes (bytes-append (string->bytes/utf-8 "No one has completed lab 2 so give them all a 0") ;65 bytes left to pad
+                               (bytes #x80) ;64 bytes left
+                               (make-bytes 62 0)
+                               (bytes 1 #xf8))) ;length of 504 in 2 bytes
+(define m2-string " (Remember it's opposite day!)")
+(define m2-bytes (string->bytes/utf-8 m2-string))
+(define padded-m2 (bytes-append m2-bytes ;34 bytes left to pad
+                                (bytes #x80) ;33 bytes left
+                                (make-bytes 31 0)
+                                (bytes 3 #x28)))
+
+(printf "message: ~a~nhash: ~x"
+        (string-append (bytes->hex-string m1-bytes)
+                       (bytes->hex-string m2-bytes))
+        (calculate-sha1 (vector (bytes->block padded-m2 0 64)) 0))
