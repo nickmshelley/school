@@ -326,7 +326,13 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                                 (make-bytes 31 0)
                                 (bytes 3 #x28)))
 
+(define (sha1-my-hash bv extra-length)
+  (let-values ([(blocks unused-bits total-length)
+                (byte-string->blocks bv)])
+    (let ((last-index (prepare-message! blocks unused-bits (+ extra-length total-length))))
+      (calculate-sha1 blocks last-index))))
+
 (printf "message: ~a~nhash: ~x"
         (string-append (bytes->hex-string m1-bytes)
                        (bytes->hex-string m2-bytes))
-        (calculate-sha1 (vector (bytes->block padded-m2 0 64)) 0))
+        (sha1-my-hash m2-bytes 1024))
