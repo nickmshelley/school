@@ -1,27 +1,37 @@
 #lang racket/gui
 (require sgl
+         sgl/gl
          sgl/gl-vectors)
 
 (define (resize w h)
+  (gl-matrix-mode 'projection)
+  (gl-load-identity)
+  (gluPerspective 45 1 .1 100)
+  (gl-matrix-mode 'modelview)
   (gl-viewport 0 0 w h)
   #t)
 
 (define (init-opengl)
   (gl-clear-color 0 0 0 1)
   (gl-color 1 1 1)
-  (gl-ortho -50 50 -50 50 -1 1)
   (gl-shade-model 'flat))
 
 (define spin 0.0)
 
 (define (draw-opengl)
-  (define new-spin (+ spin 2.0))
-  (set! spin (if (> new-spin 360) (- new-spin 360) new-spin))
-  
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
   (gl-push-matrix)
-  (gl-rotate spin 0 0 -1)
-  (gl-rect -25 -25 25 25)
+  (gluLookAt -7 5 16
+             0 0 0
+             0 1 0)
+  (set! spin (+ spin .01))
+  (printf "spin: ~a~n" spin)
+  (gl-begin 'quads)
+  (gl-vertex 5 0 5)
+  (gl-vertex 5 0 -5)
+  (gl-vertex -5 0 -5)
+  (gl-vertex -5 0 5)
+  (gl-end)
   (gl-pop-matrix)
   (gl-end))
 
