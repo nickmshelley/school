@@ -11,27 +11,58 @@
   (gl-viewport 0 0 w h)
   #t)
 
-(define (init-opengl)
-  (gl-clear-color 0 0 0 1)
-  (gl-color 1 1 1)
-  (gl-shade-model 'flat))
+(define ELEMS 10)
+(define SPREAD 5)
+(define matrix
+  (for/list ([i (in-range ELEMS)])
+    (for/list ([j (in-range ELEMS)])
+      (* 2 (random)))))
 
-(define spin 0.0)
+(define (init-opengl)
+  (gl-clear-color 1 1 1 1)
+  
+  (gl-light-v 'light0 'position (gl-float-vector 1 1 1 0))
+  
+  (gl-enable 'lighting)
+  (gl-enable 'light0)
+  (gl-depth-func 'lequal)
+  (gl-enable 'depth-test))
+
+(define (matrix-ref matrix i j)
+  (list-ref (list-ref matrix i) j))
+
+(define (draw-matrix)
+  (define delta (/ 10 ELEMS))
+  (gl-material-v 'front 'diffuse (gl-float-vector .1 .2 .8 1))
+  (gl-begin 'triangle-strip)
+  (gl-normal 0 1 0)
+  (for ([i (in-range (sub1 ELEMS))]
+        [z (in-range (- SPREAD) (- SPREAD delta) delta)])
+    ;take care of first 4 poinst which consist of 2 triangles
+    (define left (- SPREAD))
+    ;lower-left
+    (gl-vertex left (matrix-ref matrix i 0) z)
+    ;upper-left
+    (gl-vertex left (matrix-ref matrix (add1 i) 0) (+ delta z))
+    ;lower-right
+    (gl-vertex (+ delta left) (matrix-ref matrix (add1 i) 1) z)
+    ;upper-right
+    (gl-vertex (+ delta left) (matrix-ref matrix (add1 i) 1) (+ delta z))
+    (for ([j (in-range 2 ELEMS)]
+          [x (in-range (+ (* 2 delta) left) SPREAD delta)])
+      ;just do this row's and the next row's vertex because it's triangle strips
+      (gl-normal 0 (abs x) 0)
+      (gl-vertex x (matrix-ref matrix i j) z)
+      (gl-vertex x (matrix-ref matrix (add1 i) j) (+ z delta))))
+  (gl-end))
 
 (define (draw-opengl)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
   (gl-push-matrix)
   (gluLookAt -7 5 16
-             0 0 0
+             .5 0 0
              0 1 0)
-  (set! spin (+ spin .01))
-  (printf "spin: ~a~n" spin)
-  (gl-begin 'quads)
-  (gl-vertex 5 0 5)
-  (gl-vertex 5 0 -5)
-  (gl-vertex -5 0 -5)
-  (gl-vertex -5 0 5)
-  (gl-end)
+  (draw-matrix)
   (gl-pop-matrix)
   (gl-end))
 
