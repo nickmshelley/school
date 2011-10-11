@@ -5,3 +5,6 @@
 .DS_Store
 *.bak
 TAGS
+
+# compiled folder
+compiled
