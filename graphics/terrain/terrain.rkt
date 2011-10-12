@@ -7,9 +7,8 @@
 
 (struct point (x y z normal) #:mutable #:transparent)
 
-(define ELEMS 32)
+(define ELEMS 33)
 (define SPREAD 5)
-(define START-HEIGHT 5)
 (define delta (/ (* 2 SPREAD) ELEMS))
 
 (define (vector-from-point p)
@@ -25,7 +24,7 @@
              [x (in-range (- SPREAD) SPREAD delta)])
     (for/list ([j (in-range ELEMS)]
                [z (in-range (- SPREAD) SPREAD delta)])
-      (point x START-HEIGHT z #f))))
+      (point x 0 z #f))))
 
 (define matrix (empty-matrix))
 
@@ -52,8 +51,16 @@
   (gl-enable 'depth-test))
 
 ; i and j are x and y
-(define (matrix-ref matrix i j)
-  (list-ref (list-ref matrix j) i))
+(define (matrix-ref mat i j)
+  (list-ref (list-ref mat j) i))
+
+(define (in-range? num)
+  (and (>= num 0) (< num ELEMS)))
+
+(define (safe-matrix-ref mat i j)
+  (if (and (in-range? i) (in-range? j))
+      (matrix-ref mat i j)
+      #f))
 
 (define (reset-normals mat)
   (for* ([i (in-range ELEMS)]
@@ -120,8 +127,8 @@
 (define (draw-opengl)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
   (gl-push-matrix)
-  (gluLookAt -7 (+ 5 START-HEIGHT) 16
-             0 START-HEIGHT 0
+  (gluLookAt 0 20 7
+             0 0 0
              0 1 0)
   (draw-matrix)
   (gl-pop-matrix)
@@ -150,30 +157,80 @@
     
     (super-instantiate () (style '(gl)))))
 
-(define (midpoint-displace mat upper-left upper-right lower-left lower-right random-scale)
-  (void))
+(define (average point-list)
+  (define height-list (map point-y (filter point? point-list)))
+  (/ (apply + height-list)
+     (length height-list)))
 
-(define (update-values upper-left upper-right lower-left lower-right random-scale)
+(define (rand-calc rand-amount)
+  (- (* (random) rand-amount 2) rand-amount))
+
+(define scale .5)
+(define (midpoint-displace mat i j delta rand-amount)
+  (define middle (matrix-ref mat i j))
+  ;square step
+  (define top-right (matrix-ref mat (+ i delta) (+ j delta)))
+  (define top-left (matrix-ref mat (- i delta) (+ j delta)))
+  (define bottom-right (matrix-ref mat (+ i delta) (- j delta)))
+  (define bottom-left (matrix-ref mat (- i delta) (- j delta)))
+  (set-point-y! middle (+ (average (list top-right top-left bottom-right bottom-left))
+                          (rand-calc rand-amount)))
+  ;diamond step
+  (define right (matrix-ref mat (+ i delta) j))
+  (define left (matrix-ref mat (- i delta) j))
+  (define top (matrix-ref mat i (+ j delta)))
+  (define bottom (matrix-ref mat i (- j delta)))
+  (define right-right (safe-matrix-ref mat (+ i delta delta) j))
+  (define left-left (safe-matrix-ref mat (- i delta delta) j))
+  (define top-top (safe-matrix-ref mat i (+ j delta delta)))
+  (define bottom-bottom (safe-matrix-ref mat i (- j delta delta)))
+  (set-point-y! top (+ (average (list middle top-left top-right top-top))
+                       (rand-calc rand-amount)))
+  (set-point-y! right (+ (average (list middle top-right bottom-right right-right))
+                         (rand-calc rand-amount)))
+  (set-point-y! bottom (+ (average (list middle bottom-left bottom-right bottom-bottom))
+                          (rand-calc rand-amount)))
+  (set-point-y! left (+ (average (list middle top-left bottom-left left-left))
+                        (rand-calc rand-amount)))
+  ;recurse
+  (define new-delta (/ delta 2))
+  (define new-rand (* rand-amount scale))
+  (when (> delta 1)
+    (midpoint-displace mat (+ i new-delta) (+ j new-delta) new-delta new-rand)
+    (midpoint-displace mat (+ i new-delta) (- j new-delta) new-delta new-rand)
+    (midpoint-displace mat (- i new-delta) (+ j new-delta) new-delta new-rand)
+    (midpoint-displace mat (- i new-delta) (- j new-delta) new-delta new-rand)))
+
+
+(define (update-values upper-left upper-right lower-left lower-right rand-amount random-scale)
   (reset)
-  (midpoint-displace matrix upper-left upper-right lower-left lower-right random-scale))
+  (set-point-y! (matrix-ref matrix 0 0) upper-left)
+  (set-point-y! (matrix-ref matrix 0 (sub1 ELEMS)) upper-right)
+  (set-point-y! (matrix-ref matrix (sub1 ELEMS) 0) lower-left)
+  (set-point-y! (matrix-ref matrix (sub1 ELEMS) (sub1 ELEMS)) lower-right)
+  (set! scale random-scale)
+  (define mid-index (/ (sub1 ELEMS) 2))
+  (midpoint-displace matrix mid-index mid-index mid-index rand-amount))
 
 (define win (new frame% (label "OpenGl Test")))
 (define gl  (new my-canvas% (parent win) (min-width 800) (min-height 800)))
 (define main-panel (new horizontal-panel% (parent win)
-                     (alignment '(center center)) (stretchable-height #f)))
+                        (alignment '(center center)) (stretchable-height #f)))
 (define update-panel (new vertical-panel% (parent main-panel)
                           (alignment '(center center))))
 (define upper-left-field (instantiate text-field% ("upper-left" update-panel) (init-value "0")))
 (define upper-right-field (instantiate text-field% ("upper-right" update-panel) (init-value "0")))
 (define lower-left-field (instantiate text-field% ("lower-left" update-panel) (init-value "0")))
 (define lower-right-field (instantiate text-field% ("lower-right" update-panel) (init-value "0")))
+(define height-delta-field (instantiate text-field% ("max height delta" update-panel) (init-value "5")))
 (define random-scale-field (instantiate text-field% ("random scale" update-panel) (init-value ".5")))
 (instantiate button% ("Rebuild" main-panel (lambda (b e) (update-values (string->number (send upper-left-field get-value))
-                                                                       (string->number (send upper-right-field get-value))
-                                                                       (string->number (send lower-left-field get-value))
-                                                                       (string->number (send lower-right-field get-value))
-                                                                       (string->number (send random-scale-field get-value)))))
-                                             (stretchable-width #f) (stretchable-height #t))
+                                                                        (string->number (send upper-right-field get-value))
+                                                                        (string->number (send lower-left-field get-value))
+                                                                        (string->number (send lower-right-field get-value))
+                                                                        (string->number (send height-delta-field get-value))
+                                                                        (string->number (send random-scale-field get-value)))))
+  (stretchable-width #f) (stretchable-height #t))
 
 (send gl gl-init)
 (send win show #t)
