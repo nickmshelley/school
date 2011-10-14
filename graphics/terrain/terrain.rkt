@@ -187,7 +187,7 @@
     (run-stuff qu)))
 
 (define rough-scale 2)
-(define smooth-scale .3)
+(define smooth-scale .1)
 (define (set-height! p ave rand-amount)
   (define to-add
     (rand-calc (if (< ave 0)
@@ -253,11 +253,11 @@
                         (alignment '(center center)) (stretchable-height #f)))
 (define update-panel (new vertical-panel% (parent main-panel)
                           (alignment '(center center))))
-(define upper-left-field (instantiate text-field% ("upper-left" update-panel) (init-value "0")))
-(define upper-right-field (instantiate text-field% ("upper-right" update-panel) (init-value "0")))
+(define upper-left-field (instantiate text-field% ("upper-left" update-panel) (init-value "2")))
+(define upper-right-field (instantiate text-field% ("upper-right" update-panel) (init-value "2")))
 (define lower-left-field (instantiate text-field% ("lower-left" update-panel) (init-value "0")))
 (define lower-right-field (instantiate text-field% ("lower-right" update-panel) (init-value "0")))
-(define height-delta-field (instantiate text-field% ("max height delta" update-panel) (init-value "5")))
+(define height-delta-field (instantiate text-field% ("max height delta" update-panel) (init-value "3")))
 (define random-scale-field (instantiate text-field% ("random scale" update-panel) (init-value ".5")))
 (instantiate button% ("Rebuild" main-panel (lambda (b e) (update-values (string->number (send upper-left-field get-value))
                                                                         (string->number (send upper-right-field get-value))
