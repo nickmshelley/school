@@ -1,5 +1,6 @@
 #lang racket
 (require racket/gui
+         data/queue
          sgl
          sgl/gl
          sgl/gl-vectors
@@ -7,7 +8,7 @@
 
 (struct point (x y z normal) #:mutable #:transparent)
 
-(define ELEMS 33)
+(define ELEMS 65)
 (define SPREAD 5)
 (define delta (/ (* 2 SPREAD) ELEMS))
 
@@ -166,6 +167,13 @@
   (- (* (random) rand-amount 2) rand-amount))
 
 (define scale .5)
+(define q (make-queue))
+
+(define (run-stuff qu)
+  (when (not (queue-empty? qu))
+    ((dequeue! qu))
+    (run-stuff qu)))
+
 (define (midpoint-displace mat i j delta rand-amount)
   (define middle (matrix-ref mat i j))
   ;square step
@@ -196,10 +204,10 @@
   (define new-delta (/ delta 2))
   (define new-rand (* rand-amount scale))
   (when (> delta 1)
-    (midpoint-displace mat (+ i new-delta) (+ j new-delta) new-delta new-rand)
-    (midpoint-displace mat (+ i new-delta) (- j new-delta) new-delta new-rand)
-    (midpoint-displace mat (- i new-delta) (+ j new-delta) new-delta new-rand)
-    (midpoint-displace mat (- i new-delta) (- j new-delta) new-delta new-rand)))
+    (enqueue! q (lambda () (midpoint-displace mat (+ i new-delta) (+ j new-delta) new-delta new-rand)))
+    (enqueue! q (lambda () (midpoint-displace mat (+ i new-delta) (- j new-delta) new-delta new-rand)))
+    (enqueue! q (lambda () (midpoint-displace mat (- i new-delta) (+ j new-delta) new-delta new-rand)))
+    (enqueue! q (lambda () (midpoint-displace mat (- i new-delta) (- j new-delta) new-delta new-rand)))))
 
 
 (define (update-values upper-left upper-right lower-left lower-right rand-amount random-scale)
@@ -210,7 +218,8 @@
   (set-point-y! (matrix-ref matrix (sub1 ELEMS) (sub1 ELEMS)) lower-right)
   (set! scale random-scale)
   (define mid-index (/ (sub1 ELEMS) 2))
-  (midpoint-displace matrix mid-index mid-index mid-index rand-amount))
+  (enqueue! q (lambda () (midpoint-displace matrix mid-index mid-index mid-index rand-amount)))
+  (run-stuff q))
 
 (define win (new frame% (label "OpenGl Test")))
 (define gl  (new my-canvas% (parent win) (min-width 800) (min-height 800)))
