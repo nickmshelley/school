@@ -43,7 +43,7 @@
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
   
-  (gl-light-v 'light0 'position (gl-float-vector 1 1 1 0))
+  (gl-light-v 'light0 'position (gl-float-vector 0 0 1 0))
   
   (gl-shade-model 'smooth)
   (gl-enable 'lighting)
@@ -174,6 +174,15 @@
     ((dequeue! qu))
     (run-stuff qu)))
 
+(define rough-scale 2)
+(define smooth-scale .3)
+(define (set-height! p ave rand-amount)
+  (define to-add
+    (rand-calc (if (< ave 0)
+                   (* rand-amount smooth-scale)
+                   (* rand-amount rough-scale))))
+  (set-point-y! p (+ ave to-add)))
+
 (define (midpoint-displace mat i j delta rand-amount)
   (define middle (matrix-ref mat i j))
   ;square step
@@ -181,8 +190,9 @@
   (define top-left (matrix-ref mat (- i delta) (+ j delta)))
   (define bottom-right (matrix-ref mat (+ i delta) (- j delta)))
   (define bottom-left (matrix-ref mat (- i delta) (- j delta)))
-  (set-point-y! middle (+ (average (list top-right top-left bottom-right bottom-left))
-                          (rand-calc rand-amount)))
+  (set-height! middle 
+               (average (list top-right top-left bottom-right bottom-left))
+               rand-amount)
   ;diamond step
   (define right (matrix-ref mat (+ i delta) j))
   (define left (matrix-ref mat (- i delta) j))
@@ -192,14 +202,18 @@
   (define left-left (safe-matrix-ref mat (- i delta delta) j))
   (define top-top (safe-matrix-ref mat i (+ j delta delta)))
   (define bottom-bottom (safe-matrix-ref mat i (- j delta delta)))
-  (set-point-y! top (+ (average (list middle top-left top-right top-top))
-                       (rand-calc rand-amount)))
-  (set-point-y! right (+ (average (list middle top-right bottom-right right-right))
-                         (rand-calc rand-amount)))
-  (set-point-y! bottom (+ (average (list middle bottom-left bottom-right bottom-bottom))
-                          (rand-calc rand-amount)))
-  (set-point-y! left (+ (average (list middle top-left bottom-left left-left))
-                        (rand-calc rand-amount)))
+  (set-height! top
+               (average (list middle top-left top-right top-top))
+               rand-amount)
+  (set-height! right
+               (average (list middle top-right bottom-right right-right))
+               rand-amount)
+  (set-height! bottom
+               (average (list middle bottom-left bottom-right bottom-bottom))
+               rand-amount)
+  (set-height! left
+               (average (list middle top-left bottom-left left-left))
+               rand-amount)
   ;recurse
   (define new-delta (/ delta 2))
   (define new-rand (* rand-amount scale))
