@@ -1,5 +1,6 @@
 #lang racket
 (require racket/gui
+         racket/draw
          data/queue
          sgl
          sgl/gl
@@ -40,16 +41,64 @@
   (gl-viewport 0 0 w h)
   #t)
 
+(define (argb->rgb l)
+  (for/list ([i (in-range (length l))]
+             [elem l]
+             #:unless (= (modulo i 4) 0))
+    elem))
+
+(define textures (glGenTextures 3))
+(define shrub-texture (gl-vector-ref textures 0))
+(define stone-texture (gl-vector-ref textures 1))
+(define mountain-texture (gl-vector-ref textures 2))
+
+(define (generate-textures)
+  (glBindTexture GL_TEXTURE_2D shrub-texture)
+  (define shrubbery (make-bitmap 512 512))
+  (send shrubbery load-file "shrubbery.jpg" 'jpeg)
+  (define shrub-bytes (make-bytes (* 512 512 4)))
+  (send shrubbery get-argb-pixels 0 0 512 512 shrub-bytes)
+  (define shrub-pixels (list->gl-byte-vector (reverse (bytes->list shrub-bytes))))
+  (glTexImage2D GL_TEXTURE_2D 0 3 512 512 0 GL_BGRA GL_UNSIGNED_BYTE shrub-pixels)
+  (gl-pixel-store 'unpack-alignment 1)
+  (glTexParameterf GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+  (glTexParameterf GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+  (gl-enable 'texture-2d)
+  
+  (glBindTexture GL_TEXTURE_2D stone-texture)
+  (define stone (make-bitmap 512 512))
+  (send stone load-file "stone.jpg" 'jpeg)
+  (define stone-bytes (make-bytes (* 512 512 4)))
+  (send stone get-argb-pixels 0 0 512 512 stone-bytes)
+  (define stone-pixels (list->gl-byte-vector (reverse (bytes->list stone-bytes))))
+  (glTexImage2D GL_TEXTURE_2D 0 3 512 512 0 GL_BGRA GL_UNSIGNED_BYTE stone-pixels)
+  (gl-pixel-store 'unpack-alignment 1)
+  (glTexParameterf GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+  (glTexParameterf GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+  (gl-enable 'texture-2d)
+  
+  (glBindTexture GL_TEXTURE_2D mountain-texture)
+  (define mountain (make-bitmap 1024 1024))
+  (send mountain load-file "mountain.png")
+  (define mountain-bytes (make-bytes (* 1024 1024 4)))
+  (send mountain get-argb-pixels 0 0 1024 1024 mountain-bytes)
+  (define mountain-pixels (list->gl-byte-vector (reverse (bytes->list mountain-bytes))))
+  (glTexImage2D GL_TEXTURE_2D 0 3 1024 1024 0 GL_BGRA GL_UNSIGNED_BYTE mountain-pixels)
+  (gl-pixel-store 'unpack-alignment 1)
+  (glTexParameterf GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+  (glTexParameterf GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+  (gl-enable 'texture-2d))
+
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
-  
   (gl-light-v 'light0 'position (gl-float-vector 0 0 1 0))
-  
   (gl-shade-model 'smooth)
   (gl-enable 'lighting)
   (gl-enable 'light0)
   (gl-depth-func 'lequal)
-  (gl-enable 'depth-test))
+  (gl-enable 'depth-test)
+  (generate-textures)
+  (glBindTexture GL_TEXTURE_2D stone-texture))
 
 ; i and j are x and y
 (define (matrix-ref mat i j)
@@ -69,15 +118,70 @@
     (reset-normal (matrix-ref mat i j))))
 
 (define (get-color p n)
+  ;default
+  (gl-float-vector 1 1 1 1)
+  ;elevation
+  #;(if (< (point-y p) 0)
+        (gl-float-vector .2 .7 .3 1)
+        (gl-float-vector .6 .3 .2 1))
+  ;slope
+  #;(if (> (gl-vector-ref n 1) .7)
+        (gl-float-vector .2 .7 .3 1)
+        (gl-float-vector .7 .8 .8 1))
+  ;aspect
+  #;(if (> (gl-vector-ref n 0) .6)
+        (gl-float-vector .2 .7 .3 1)
+        (gl-float-vector .7 .8 .8 1)))
+
+(define current-texture -1)
+(define (get-texture p n)
+  ;default
+  shrub-texture
+  ;elevation
   (if (< (point-y p) 0)
-      (gl-float-vector .2 .7 .3 1)
-      (gl-float-vector .6 .3 .2 1)))
+        shrub-texture
+        mountain-texture)
+  ;slope
+  #;(if (> (gl-vector-ref n 1) .7)
+        shrub-texture
+        mountain-texture)
+  ;aspect
+  #;(if (> (gl-vector-ref n 0) .6)
+        shrub-texture
+        mountain-texture))
+
+(define (draw-points center-point top-point)
+  (define center-normal (point-normal center-point))
+  (gl-normal-v center-normal)
+  (gl-material-v 'front 'ambient-and-diffuse 
+                 (get-color center-point center-normal))
+  (gl-tex-coord (point-x center-point) (point-z center-point))
+  (gl-vertex-v (vector-from-point center-point))
+  
+  (define top-normal (point-normal top-point))
+  (gl-normal-v top-normal)
+  (gl-material-v 'front 'ambient-and-diffuse 
+                 (get-color top-point top-normal))
+  (gl-tex-coord (point-x top-point) (point-z top-point))
+  (gl-vertex-v (vector-from-point top-point)))
+
+(define (draw-points-with-texture left-point top-left-point center-point top-point)
+  (define center-normal (point-normal center-point))
+  (define new-texture (get-texture center-point center-normal))
+  (unless (= current-texture new-texture)
+    (set! current-texture new-texture)
+    (gl-end)
+    (glBindTexture GL_TEXTURE_2D current-texture)
+    (gl-begin 'triangle-strip)
+    (draw-points left-point top-left-point))
+  (draw-points center-point top-point))
 
 (define (draw-matrix)
   (reset-normals matrix)
-  (for ([j (in-range 1 (sub1 ELEMS))])
+  (for ([j (in-range (sub1 ELEMS))])
+    (set! current-texture -1)
     (gl-begin 'triangle-strip)
-    (for ([i (in-range 1 ELEMS)])
+    (for ([i (in-range 0 ELEMS)])
       (define zero-vector (gl-float-vector 0 0 0))
       (define center-point (matrix-ref matrix i j))
       (define top-point (matrix-ref matrix i (add1 j)))
@@ -86,9 +190,11 @@
       (define top-top (if (< j (- ELEMS 2))
                           (vector-from-point (matrix-ref matrix i (+ 2 j)))
                           #f))
-      (define left (if (> i 1)
-                       (vector-from-point (matrix-ref matrix (sub1 i) j))
-                       #f))
+      (define-values (left-point left)
+        (if (> i 0)
+            (values (matrix-ref matrix (sub1 i) j)
+                    (vector-from-point (matrix-ref matrix (sub1 i) j)))
+            (values #f #f)))
       (define top-top-left (if (and (< j (- ELEMS 2)) (> i 1))
                                (vector-from-point (matrix-ref matrix (sub1 i) (+ 2 j)))
                                #f))
@@ -98,43 +204,36 @@
       (define top-right (if (< i (sub1 ELEMS))
                             (vector-from-point (matrix-ref matrix (add1 i) (add1 j)))
                             #f))
-      (define bottom (if (> j 1)
+      (define bottom (if (> j 0)
                          (vector-from-point (matrix-ref matrix i (sub1 j)))
                          #f))
-      (define top-left (if (> i 1)
-                           (vector-from-point (matrix-ref matrix (sub1 i) (add1 j)))
-                           #f))
+      (define-values (top-left-point top-left)
+        (if (> i 0)
+            (values (matrix-ref matrix (sub1 i) (add1 j))
+                    (vector-from-point (matrix-ref matrix (sub1 i) (add1 j))))
+            (values #f #f)))
       (define bottom-right (if (and (> j 1) (< i (sub1 ELEMS)))
                                (vector-from-point (matrix-ref matrix (add1 i) (sub1 j)))
                                #f))
-      (define center-normal 
-        (point-up
-         (if (point-normal center-point)
-             (point-normal center-point)
-             (normalize (add-vectors (list (normal-from-vectors center left top-left)
-                                           (normal-from-vectors center top-left top)
-                                           (normal-from-vectors center top right)
-                                           (normal-from-vectors center right bottom-right)
-                                           (normal-from-vectors center bottom-right bottom)
-                                           (normal-from-vectors center bottom left)))))))
-      (gl-normal-v center-normal)
-      (gl-material-v 'front 'ambient-and-diffuse 
-                      (get-color center-point center-normal))
-      (gl-vertex-v center)
-      (define top-normal 
-        (point-up
-         (if (point-normal top-point)
-             (point-normal top-point)
-             (normalize (add-vectors (list (normal-from-vectors top top-left top-top-left)
-                                           (normal-from-vectors top top-top-left top-top)
-                                           (normal-from-vectors top top-top top-right)
-                                           (normal-from-vectors top top-right right)
-                                           (normal-from-vectors top right center)
-                                           (normal-from-vectors top center top-left)))))))
-      (gl-normal-v top-normal)
-      (gl-material-v 'front 'ambient-and-diffuse 
-                      (get-color top-point top-normal))
-      (gl-vertex-v top))
+      
+      (unless (point-normal center-point)
+        (set-point-normal! center-point (point-up (normalize (add-vectors (list (normal-from-vectors center left top-left)
+                                                                                (normal-from-vectors center top-left top)
+                                                                                (normal-from-vectors center top right)
+                                                                                (normal-from-vectors center right bottom-right)
+                                                                                (normal-from-vectors center bottom-right bottom)
+                                                                                (normal-from-vectors center bottom left)))))))
+      (unless (point-normal top-point)
+        (set-point-normal! top-point (point-up (normalize (add-vectors (list (normal-from-vectors top top-left top-top-left)
+                                                                             (normal-from-vectors top top-top-left top-top)
+                                                                             (normal-from-vectors top top-top top-right)
+                                                                             (normal-from-vectors top top-right right)
+                                                                             (normal-from-vectors top right center)
+                                                                             (normal-from-vectors top center top-left)))))))
+      (when (> i 0)
+        (if (< i (sub1 ELEMS))
+            (draw-points-with-texture left-point top-left-point center-point top-point)
+            (draw-points center-point top-point))))
     (gl-end)))
 
 (define (draw-opengl)
