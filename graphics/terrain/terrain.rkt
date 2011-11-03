@@ -9,13 +9,16 @@
 
 (struct point (x y z normal) #:mutable #:transparent)
 
+(define (get-point-y p)
+  (force (point-y p)))
+
 (define ELEMS 65)
 (define SPREAD 5)
 (define delta (/ (* 2 SPREAD) ELEMS))
 
 (define (vector-from-point p)
   (gl-float-vector (point-x p)
-                   (point-y p)
+                   (get-point-y p)
                    (point-z p)))
 
 (define (reset-normal p)
@@ -121,7 +124,7 @@
   ;default
   (gl-float-vector 1 1 1 1)
   ;elevation
-  (if (< (point-y p) 0)
+  (if (< (get-point-y p) 0)
         (gl-float-vector .2 .7 .3 1)
         (gl-float-vector .6 .3 .2 1))
   ;slope
@@ -138,7 +141,7 @@
   ;default
   shrub-texture
   ;elevation
-  (if (< (point-y p) 0)
+  (if (< (get-point-y p) 0)
         shrub-texture
         mountain-texture)
   ;slope
@@ -271,7 +274,7 @@
     (super-instantiate () (style '(gl)))))
 
 (define (average point-list)
-  (define height-list (map point-y (filter point? point-list)))
+  (define height-list (map get-point-y (filter point? point-list)))
   (/ (apply + height-list)
      (length height-list)))
 
@@ -288,12 +291,12 @@
 
 (define rough-scale 2)
 (define smooth-scale .1)
-(define (set-height! p ave rand-amount)
+(define (calculate-height ave rand-amount)
   (define to-add
     (rand-calc (if (< ave 0)
                    (* rand-amount smooth-scale)
                    (* rand-amount rough-scale))))
-  (set-point-y! p (+ ave to-add)))
+  (+ ave to-add))
 
 (define (midpoint-displace mat i j delta rand-amount)
   (define middle (matrix-ref mat i j))
@@ -302,9 +305,10 @@
   (define top-left (matrix-ref mat (- i delta) (+ j delta)))
   (define bottom-right (matrix-ref mat (+ i delta) (- j delta)))
   (define bottom-left (matrix-ref mat (- i delta) (- j delta)))
-  (set-height! middle 
-               (average (list top-right top-left bottom-right bottom-left))
-               rand-amount)
+  (set-point-y! middle 
+               (delay (calculate-height
+                (average (list top-right top-left bottom-right bottom-left))
+               rand-amount)))
   ;diamond step
   (define right (matrix-ref mat (+ i delta) j))
   (define left (matrix-ref mat (- i delta) j))
@@ -314,26 +318,30 @@
   (define left-left (safe-matrix-ref mat (- i delta delta) j))
   (define top-top (safe-matrix-ref mat i (+ j delta delta)))
   (define bottom-bottom (safe-matrix-ref mat i (- j delta delta)))
-  (set-height! top
-               (average (list middle top-left top-right top-top))
-               rand-amount)
-  (set-height! right
-               (average (list middle top-right bottom-right right-right))
-               rand-amount)
-  (set-height! bottom
-               (average (list middle bottom-left bottom-right bottom-bottom))
-               rand-amount)
-  (set-height! left
-               (average (list middle top-left bottom-left left-left))
-               rand-amount)
+  (set-point-y! top
+               (delay (calculate-height
+                (average (list middle top-left top-right top-top))
+               rand-amount)))
+  (set-point-y! right
+               (delay (calculate-height
+                (average (list middle top-right bottom-right right-right))
+               rand-amount)))
+  (set-point-y! bottom
+               (delay (calculate-height
+                (average (list middle bottom-left bottom-right bottom-bottom))
+               rand-amount)))
+  (set-point-y! left
+               (delay (calculate-height
+                (average (list middle top-left bottom-left left-left))
+               rand-amount)))
   ;recurse
   (define new-delta (/ delta 2))
   (define new-rand (* rand-amount scale))
   (when (> delta 1)
-    (enqueue! q (lambda () (midpoint-displace mat (+ i new-delta) (+ j new-delta) new-delta new-rand)))
-    (enqueue! q (lambda () (midpoint-displace mat (+ i new-delta) (- j new-delta) new-delta new-rand)))
-    (enqueue! q (lambda () (midpoint-displace mat (- i new-delta) (+ j new-delta) new-delta new-rand)))
-    (enqueue! q (lambda () (midpoint-displace mat (- i new-delta) (- j new-delta) new-delta new-rand)))))
+    (midpoint-displace mat (+ i new-delta) (+ j new-delta) new-delta new-rand)
+    (midpoint-displace mat (+ i new-delta) (- j new-delta) new-delta new-rand)
+    (midpoint-displace mat (- i new-delta) (+ j new-delta) new-delta new-rand)
+    (midpoint-displace mat (- i new-delta) (- j new-delta) new-delta new-rand)))
 
 
 (define (update-values upper-left upper-right lower-left lower-right rand-amount random-scale)
