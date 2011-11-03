@@ -37,3 +37,47 @@
     ['b (lambda (x) (print 2) (add1 x))]
     [x (lambda (x) x)]))
 
+(struct turtle (x y angle))
+(struct state (turt verts))
+
+;table lookup from char to string
+(define line
+  (match-lambda
+    ['F '(F F)]
+    [x (list x)]))
+(check-equal? (eval-lsys line 2 '(F)) '(F F F F))
+
+(define (move-forward a-state)
+  (define d 1)
+  (define the-turtle (state-turt a-state))
+  (state (turtle (+ (turtle-x the-turtle)
+                    (* d (cos (turtle-angle the-turtle))))
+                 (+ (turtle-y the-turtle)
+                    (* d (sin (turtle-angle the-turtle))))
+                 (turtle-angle the-turtle))
+         (state-verts a-state)))
+
+(define (vector-from-state a-state)
+  (define the-turtle (state-turt a-state))
+  (vector (turtle-x the-turtle)
+          (turtle-y the-turtle)
+          0))
+
+(define (move-forward-and-draw a-state)
+  ;move to next position
+  (define next-state (move-forward a-state))
+  ;output new vertex for line
+  (define vec (vector-from-state next-state))
+  (state (state-turt next-state)
+         (cons vec (state-verts next-state))))
+
+(define line-interp
+  (match-lambda
+    ['F (lambda (state) (move-forward-and-draw state))]
+    ['f (lambda (state) (move-forward state))]
+    [x (lambda (x) x)]))
+
+(define vecs (reverse (state-verts (turtle-eval line-interp 
+                                                (state (turtle 0 0 (/ pi 2)) (list (vector 0 0 0)))
+                                                (eval-lsys line 2 '(F))))))
+(print vecs)
