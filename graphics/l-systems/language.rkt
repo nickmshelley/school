@@ -1,31 +1,27 @@
 #lang racket
-(require "semantics.rkt")
+(require "semantics.rkt"
+         "render.rkt")
 
-(provide f
-         F
-         plus
-         minus
+(provide l-system
          (rename-out [my-module-begin #%module-begin]))
-
-(define current-state (make-parameter (new-state)))
 
 (define-syntax-rule (my-module-begin body ...)
   (#%plain-module-begin
-   (parameterize ([current-state (new-state)])
-     body ...)))
+   body ...))
 
-(define-syntax-rule (f)
-  (move-forward (current-state)))
+(define-syntax-rule (productions prod-list)
+  (match-lambda
+    (for ([prod prod-list]) ;this needs to be a macro for that goes away
+      [(first prod) (second prod)])
+    [x (list (list 1 (list x)))]))
 
-(define-syntax-rule (F)
-  (move-forward-and-draw (current-state)))
+(define-syntax-rule (l-system beta start-angle length generations axiom productions)
+  (render (turtle-eval global-interp
+                                 (state (turtle 0 0 (* start-angle 0.0174532925) (list (vector 0 0 0)) (vector .3 .1 .3))
+                                        empty
+                                        empty
+                                        empty
+                                        length
+                                        beta)
+                                 (eval-lsys (productions) generations axiom))))
 
-(define-syntax-rule (plus)
-  (rotate-left (current-state)))
-
-(define-syntax-rule (minus)
-  (rotate-right (current-state)))
-
-(define-syntax-rule (interp body ...)
-  (parameterize ([current-state (new-state)])
-    body ...))
