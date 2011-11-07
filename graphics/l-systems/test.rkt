@@ -1,4 +1,12 @@
 #lang s-exp "language.rkt"
+(2d #:beta 22.5
+    #:start-angle 90
+    #:length .05
+    (F))
+(F -> 0.33 => F [+ F] F [- F] F
+      0.33 => F [+ F] F
+      0.34 => F [- F] F)
+
 
 ;beta -> 22.5
 ;start-angle -> 90
@@ -7,12 +15,3 @@
 ;F .33 -> F [ + F ] F [ - F ] F
 ;  .33 -> F [ + F ] F
 ;  .34 -> F [ - F ] F
-
-(l-system 22.5 ;beta
-          90 ;start-angle
-          .05 ;length
-          5
-          '(F) ;axiom
-          (productions '(('F '((.33 (F \[ + F \] F \[ − F \] F))
-                               (.33 (F \[ + F \] F))
-                               (.34 (F \[ - F \] F)))))))

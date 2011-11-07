@@ -8,12 +8,15 @@
   (if (or (= (length prods) 1)
           (< roll (+ prob (first (first prods)))))
       (second (first prods))
-      (find-production (+ prob (first (first prods))) roll (rest prods))))
+      (find-production (+ prob (first (first prods)))
+                       roll
+                       (rest prods))))
 
 ;ask how to do this cool
 (define (random-production prods)
   (define roll (random))
-  (find-production 0 roll prods))
+  (define ans (find-production 0 roll prods))
+  ans)
 
 ;eval-lsys : (symbol->listOfSymbol) nat listOfSymbol -> listOfSymbol
 (define (eval-lsys produce generations axiom)

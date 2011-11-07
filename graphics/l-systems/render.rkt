@@ -17,7 +17,7 @@
 
 (define plant
   (match-lambda
-    ['F '(1 (F F - \[ - F + F + F \] + \[ + F - F - F \]))]
+    ['F '((1 (F F - \[ - F + F + F \] + \[ + F - F - F \])))]
     [x (list (list 1 (list x)))]))
 
 (define another-plant
@@ -49,9 +49,9 @@
                                         empty
                                         empty
                                         empty
-                                        .1
-                                        20)
-                                 (eval-lsys random-plant 5 '(F))))
+                                        .05
+                                        22.5)
+                                 (eval-lsys plant 5 '(F))))
 
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
@@ -123,3 +123,5 @@
   (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800) (lines the-lines) (colors the-colors)))
   (send gl gl-init)
   (send win show #t))
+
+(render final-state)
