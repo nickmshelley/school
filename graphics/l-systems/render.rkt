@@ -12,7 +12,7 @@
 ;table lookup from char to string
 (define koch-snowflake
   (match-lambda
-    ['F '((F +  F - - F + F))]
+    ['F '(1 (F +  F - - F + F))]
     [x (list (list 1 (list x)))]))
 
 (define plant
@@ -49,9 +49,9 @@
                                         empty
                                         empty
                                         empty
-                                        .1
+                                        .05
                                         20)
-                                 (eval-lsys random-plant 5 '(F))))
+                                 (eval-lsys another-plant 5 '(X))))
 
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
@@ -123,3 +123,5 @@
   (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800) (lines the-lines) (colors the-colors)))
   (send gl gl-init)
   (send win show #t))
+
+;(render final-state)
