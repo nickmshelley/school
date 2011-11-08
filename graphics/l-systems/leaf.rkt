@@ -1,7 +1,7 @@
 #lang s-exp "language.rkt"
 
-beta -> 45
-start-angle -> 45
+beta -> 22.5
+start-angle -> 90
 length -> .025
 generations -> 7
 axiom -> (X)

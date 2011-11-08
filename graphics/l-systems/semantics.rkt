@@ -5,10 +5,13 @@
 (struct state (turt turtle-stack branch-verts colors d beta))
 
 (define (find-production prob roll prods)
-  (if (or (= (length prods) 1)
-          (< roll (+ prob (first (first prods)))))
-      (second (first prods))
-      (find-production (+ prob (first (first prods))) roll (rest prods))))
+  (match prods
+    [(list (list num ans)) 
+     ans]
+    [(list (list num ans) another ...)
+     (if (< roll (+ prob num))
+         ans
+         (find-production (+ prob num) roll another))]))
 
 ;ask how to do this cool
 (define (random-production prods)
@@ -32,31 +35,18 @@
 (define (move-forward a-state)
   (define d (state-d a-state))
   (define the-turtle (state-turt a-state))
-  (state (turtle (+ (turtle-x the-turtle)
-                    (* d (cos (turtle-angle the-turtle))))
-                 (+ (turtle-y the-turtle)
-                    (* d (sin (turtle-angle the-turtle))))
-                 (turtle-angle the-turtle)
-                 (turtle-verts the-turtle)
-                 (turtle-color the-turtle))
-         (state-turtle-stack a-state)
-         (state-branch-verts a-state)
-         (state-colors a-state)
-         (state-d a-state)
-         (state-beta a-state)))
+  (struct-copy state a-state
+               [turt (struct-copy turtle the-turtle
+                                  [x (+ (turtle-x the-turtle)
+                                        (* d (cos (turtle-angle the-turtle))))]
+                                  [y (+ (turtle-y the-turtle)
+                                        (* d (sin (turtle-angle the-turtle))))])]))
 
 (define (add-angle a-state angle)
   (define the-turtle (state-turt a-state))
-  (state (turtle (turtle-x the-turtle)
-                 (turtle-y the-turtle)
-                 (+ (turtle-angle the-turtle) angle)
-                 (turtle-verts the-turtle)
-                 (turtle-color the-turtle))
-         (state-turtle-stack a-state)
-         (state-branch-verts a-state)
-         (state-colors a-state)
-         (state-d a-state)
-         (state-beta a-state)))
+  (struct-copy state a-state
+               [turt (struct-copy turtle the-turtle
+                                  [angle (+ (turtle-angle the-turtle) angle)])]))
 
 (define (rotate-left a-state)
   (define beta (* (state-beta a-state) 0.0174532925))
@@ -74,16 +64,9 @@
 
 (define (add-vert a-state vert)
   (define the-turtle (state-turt a-state))
-  (state (turtle (turtle-x the-turtle)
-                 (turtle-y the-turtle)
-                 (turtle-angle the-turtle)
-                 (cons vert (turtle-verts the-turtle))
-                 (turtle-color the-turtle))
-         (state-turtle-stack a-state)
-         (state-branch-verts a-state)
-         (state-colors a-state)
-         (state-d a-state)
-         (state-beta a-state)))
+  (struct-copy state a-state
+               [turt (struct-copy turtle the-turtle
+                                  [verts (cons vert (turtle-verts the-turtle))])]))
 
 (define (move-forward-and-draw a-state)
   ;move to next position
@@ -94,37 +77,32 @@
 
 (define (clear-turtle-verts a-turtle)
   (define color (turtle-color a-turtle))
-  (turtle (turtle-x a-turtle)
-          (turtle-y a-turtle)
-          (turtle-angle a-turtle)
-          (list (first (turtle-verts a-turtle)))
-          (vector (vector-ref color 0)
-                  (+ (vector-ref color 1) .1)
-                  (vector-ref color 2))))
+  (struct-copy turtle a-turtle
+               [verts (list (first (turtle-verts a-turtle)))]
+               [color (vector (vector-ref color 0)
+                              (+ (vector-ref color 1) .1)
+                              (vector-ref color 2))]))
 
 (define (push-turtle a-state)
-  (state (clear-turtle-verts (state-turt a-state))
-         (cons (state-turt a-state) (state-turtle-stack a-state))
-         (state-branch-verts a-state)
-         (state-colors a-state)
-         (state-d a-state)
-         (state-beta a-state)))
+  (struct-copy state a-state
+               [turt (clear-turtle-verts (state-turt a-state))]
+               [turtle-stack (cons (state-turt a-state) 
+                                   (state-turtle-stack a-state))]))
 
 (define (pop-turtle a-state)
-  (state (first (state-turtle-stack a-state))
-         (rest (state-turtle-stack a-state))
-         (cons (turtle-verts (state-turt a-state))
-               (state-branch-verts a-state))
-         (cons (turtle-color (state-turt a-state))
-               (state-colors a-state))
-         (state-d a-state)
-         (state-beta a-state)))
+  (struct-copy state a-state
+               [turt (first (state-turtle-stack a-state))]
+               [turtle-stack (rest (state-turtle-stack a-state))]
+               [branch-verts (cons (turtle-verts (state-turt a-state))
+                                   (state-branch-verts a-state))]
+               [colors (cons (turtle-color (state-turt a-state))
+                             (state-colors a-state))]))
 
 (define global-interp
   (match-lambda
-    ['F (lambda (state) (move-forward-and-draw state))]
-    ['- (lambda (state) (rotate-right state))]
-    ['+ (lambda (state) (rotate-left state))]
-    ['\[ (lambda (state) (push-turtle state))]
-    ['\] (lambda (state) (pop-turtle state))]
+    ['F move-forward-and-draw]
+    ['- rotate-right]
+    ['+ rotate-left]
+    ['\[ push-turtle]
+    ['\] pop-turtle]
     [x (lambda (x) x)]))
