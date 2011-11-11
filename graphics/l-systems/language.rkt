@@ -25,7 +25,7 @@
                   (~datum start-angle) (~datum ->) start-angle*:number 
                   (~datum length) (~datum ->) length*:number
                   (~datum generations) (~datum ->) generations*:number
-                  (~datum axiom) (~datum ->) (axiom*:id ...)
+                  (~datum axiom) (~datum ->) (~seq axiom*:id (~peek-not (~datum ->))) ...
                   (~seq lhs (~datum ->) (~seq prob:number (~datum =>) 
                                               (~seq prod:id (~peek-not (~datum ->)))
                                               ...)
