@@ -18,10 +18,16 @@
     ...
     [x (list (list 1 (list x)))]))
 
-(define-syntax (kinda-quote stx ...)
+(define-syntax (kinda-quote stx)
   (syntax-parse
    stx
-   [(_ x:id) #'x]))
+   [(_ x:id) (syntax (list 'x))]
+   [(_ (x ...)) (syntax
+                (append (list '\[)
+                        (kinda-quote x ...)
+                        (list '\])))]
+   [(_ fst ...) (syntax (append
+                         (kinda-quote fst) ...))]))
 
 (define-syntax (l-system stx)
   (syntax-parse 
@@ -33,7 +39,7 @@
      (~datum generations) (~datum ->) generations*:number
      (~datum axiom) (~datum ->) (~seq axiom*:id (~peek-not (~datum ->))) ...
      (~seq lhs (~datum ->) (~seq prob:number (~datum =>) 
-                                 (~seq prod:id (~peek-not (~datum ->)))
+                                 (~seq prod (~peek-not (~or (~datum ->) (~datum =>))))
                                  ...)
            ...)
      ...)
@@ -46,7 +52,7 @@
                                   beta*)
                            (eval-lsys 
                             (match-lambda
-                              ['lhs '((prob ((kinda-quote prod ...)))
+                              ['lhs `((prob ,(kinda-quote prod ...))
                                       ...)]
                               ...
                               [x (list (list 1 (list x)))])
