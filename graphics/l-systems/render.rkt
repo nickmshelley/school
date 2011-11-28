@@ -32,7 +32,17 @@
     (gl-vertex-v (vector->gl-float-vector vert)))
   (gl-end))
 
-(define (analyze lines)
+(define cam-x 0)
+(define cam-y 0)
+(define cam-z 2)
+(define look-x 0)
+(define look-y 0)
+(define look-z -1)
+(define rotate-angle 0)
+(define delta-angle .01)
+(define delta-pos .1)
+
+(define (analyze! lines)
   (define xs 
     (append-map (lambda (v)
                   (map vector-ref v
@@ -59,17 +69,45 @@
                    2))
   (define z-pos (max (- (apply max xs) (apply min xs))
                      (- (apply max ys) (apply min ys))))
-  (values x-ave y-ave z-ave (max (* z-pos 1.3) 1)))
+  (set! cam-x x-ave)
+  (set! cam-y y-ave)
+  (set! cam-z (max (* z-pos 1.3) 1))
+  (set! delta-pos (* cam-z .05))
+  (set! delta-angle (* delta-pos .1)))
 
-(define (draw-opengl lines colors x-ave y-ave z-ave z-pos)
+(define (draw-opengl lines colors)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
   (gl-push-matrix)
   (gl-line-width 2)
-  (gluLookAt x-ave y-ave z-pos
-             x-ave y-ave z-ave
+  (gluLookAt cam-x cam-y cam-z
+             (+ cam-x look-x) (+ cam-y look-y) (+ cam-z look-z)
              0 1 0)
   (map draw-line lines colors)
   (gl-pop-matrix))
+
+(define (look-left)
+  (set! rotate-angle (- rotate-angle delta-angle))
+  (set! look-x (sin rotate-angle))
+  (set! look-z (- (cos rotate-angle))))
+
+(define (look-right)
+  (set! rotate-angle (+ rotate-angle delta-angle))
+  (set! look-x (sin rotate-angle))
+  (set! look-z (- (cos rotate-angle))))
+
+(define (go-forward)
+  (set! cam-x (+ cam-x (* look-x delta-pos)))
+  (set! cam-z (+ cam-z (* look-z delta-pos))))
+
+(define (go-back)
+  (set! cam-x (- cam-x (* look-x delta-pos)))
+  (set! cam-z (- cam-z (* look-z delta-pos))))
+
+(define (go-up)
+  (set! cam-y (+ cam-y delta-pos)))
+
+(define (go-down)
+  (set! cam-y (- cam-y delta-pos)))
 
 (define my-canvas%
   (class* canvas% ()
@@ -77,9 +115,6 @@
     
     (init-field lines)
     (init-field colors)
-    
-    (define-values (x-ave y-ave z-ave z-pos)
-      (analyze lines))
     
     (define/public (gl-init)
       (with-gl-context
@@ -89,7 +124,7 @@
     (define/override (on-paint)
       (with-gl-context
        (lambda ()
-         (draw-opengl lines colors x-ave y-ave z-ave z-pos)
+         (draw-opengl lines colors)
          (swap-gl-buffers)
          (queue-callback (lambda x (send this refresh)) #f))))
     
@@ -98,6 +133,17 @@
        (lambda ()
          (resize width height))))
     
+    (define/override (on-char event)
+      (define ch (send event get-key-code))
+      (match ch
+        [#\a (look-left)]
+        [#\d (look-right)]
+        [#\s (go-back)]
+        [#\w (go-forward)]
+        [#\e (go-up)]
+        [#\q (go-down)]
+        [else (void)]))
+    
     (super-instantiate () (style '(gl)))))
 
 (define (render final-state)
@@ -105,6 +151,7 @@
                           (state-branch-verts final-state)))
   (define the-colors (cons (turtle-color (state-turt final-state))
                            (state-colors final-state)))
+  (analyze! the-lines)
   
   (define win (new frame% (label "L-Systems")))
   (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800) (lines the-lines) (colors the-colors)))
