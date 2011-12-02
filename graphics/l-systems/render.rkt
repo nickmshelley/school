@@ -39,6 +39,7 @@
   (gl-push-matrix)
   (gl-translate tx ty tz)
   (gl-rotate angle rx ry rz)
+  (gluSphere (gluNewQuadric) radius 40 40)
   (gluCylinder (gluNewQuadric) radius radius p-len 40 40)
   (gl-pop-matrix))
 
