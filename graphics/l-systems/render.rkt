@@ -1,6 +1,7 @@
 #lang racket
 
 (require "semantics.rkt"
+         "sgl-vectors-utils.rkt"
          racket/gui
          racket/draw
          sgl
@@ -25,12 +26,29 @@
   (gl-viewport 0 0 w h)
   #t)
 
+(define radius 0.01)
+(define (cylinder-between-points a b)
+  (define z (gl-float-vector 0 0 1))
+  (define p (sub-vectors a b))
+  (define p-len (vec-length p))
+  (define t (cross-product z p))
+  (define angle (* 57.29577951308232 
+                   (acos (/ (dot-product z p) p-len))))
+  (define-values (tx ty tz) (get-vector-elements b))
+  (define-values (rx ry rz) (get-vector-elements t))
+  (gl-push-matrix)
+  (gl-translate tx ty tz)
+  (gl-rotate angle rx ry rz)
+  (gluCylinder (gluNewQuadric) radius radius p-len 40 40)
+  (gl-pop-matrix))
+
 (define (draw-line line color)
-  (gl-begin 'line-strip)
   (gl-color-v (vector->gl-float-vector color))
-  (for ([vert line])
-    (gl-vertex-v (vector->gl-float-vector vert)))
-  (gl-end))
+  (define vec-line (map vector->gl-float-vector line))
+  (for ([start vec-line]
+        [end (rest vec-line)])
+    (cylinder-between-points start end))
+  (cylinder-between-points (last vec-line) (first vec-line)))
 
 (define cam-x 0)
 (define cam-y 0)
@@ -73,12 +91,12 @@
   (set! cam-y y-ave)
   (set! cam-z (max (* z-pos 1.3) 1))
   (set! delta-pos (* cam-z .05))
-  (set! delta-angle (* delta-pos .1)))
+  (set! delta-angle (* delta-pos .1))
+  (set! radius (* delta-pos .03)))
 
 (define (draw-opengl lines colors)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
   (gl-push-matrix)
-  (gl-line-width 2)
   (gluLookAt cam-x cam-y cam-z
              (+ cam-x look-x) (+ cam-y look-y) (+ cam-z look-z)
              0 1 0)
