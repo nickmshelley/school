@@ -3,6 +3,6 @@
 beta -> 22.5
 start-angle -> 90
 length -> .05
-generations -> 5
+generations -> 4
 axiom -> F
 F -> 1 => F F - [- F + F + F] + [+ F - F - F]

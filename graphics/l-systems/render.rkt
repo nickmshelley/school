@@ -57,6 +57,9 @@
 (define look-x 0)
 (define look-y 0)
 (define look-z -1)
+(define left-x -1)
+(define left-y 0)
+(define left-z 0)
 (define rotate-angle 0)
 (define delta-angle .01)
 (define delta-pos .1)
@@ -92,7 +95,7 @@
   (set! cam-y y-ave)
   (set! cam-z (max (* z-pos 1.3) 1))
   (set! delta-pos (* cam-z .05))
-  (set! delta-angle (* delta-pos .1))
+  (set! delta-angle (* delta-pos .15))
   (set! radius (* delta-pos .03)))
 
 (define (draw-opengl lines colors)
@@ -107,12 +110,16 @@
 (define (look-left)
   (set! rotate-angle (- rotate-angle delta-angle))
   (set! look-x (sin rotate-angle))
-  (set! look-z (- (cos rotate-angle))))
+  (set! look-z (- (cos rotate-angle)))
+  (set! left-x (sin (- rotate-angle (/ pi 2))))
+  (set! left-z (- (cos (- rotate-angle (/ pi 2))))))
 
 (define (look-right)
   (set! rotate-angle (+ rotate-angle delta-angle))
   (set! look-x (sin rotate-angle))
-  (set! look-z (- (cos rotate-angle))))
+  (set! look-z (- (cos rotate-angle)))
+  (set! left-x (sin (- rotate-angle (/ pi 2))))
+  (set! left-z (- (cos (- rotate-angle (/ pi 2))))))
 
 (define (go-forward)
   (set! cam-x (+ cam-x (* look-x delta-pos)))
@@ -121,6 +128,14 @@
 (define (go-back)
   (set! cam-x (- cam-x (* look-x delta-pos)))
   (set! cam-z (- cam-z (* look-z delta-pos))))
+
+(define (go-right)
+  (set! cam-x (- cam-x (* left-x delta-pos)))
+  (set! cam-z (- cam-z (* left-z delta-pos))))
+
+(define (go-left)
+  (set! cam-x (+ cam-x (* left-x delta-pos)))
+  (set! cam-z (+ cam-z (* left-z delta-pos))))
 
 (define (go-up)
   (set! cam-y (+ cam-y delta-pos)))
@@ -155,12 +170,14 @@
     (define/override (on-char event)
       (define ch (send event get-key-code))
       (match ch
-        [#\a (look-left)]
-        [#\d (look-right)]
+        [#\a (go-left)]
+        [#\d (go-right)]
         [#\s (go-back)]
         [#\w (go-forward)]
         [#\e (go-up)]
         [#\q (go-down)]
+        ['left (look-left)]
+        ['right (look-right)]
         [else (void)]))
     
     (super-instantiate () (style '(gl)))))
@@ -173,6 +190,26 @@
   (analyze! the-lines)
   
   (define win (new frame% (label "L-Systems")))
-  (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800) (lines the-lines) (colors the-colors)))
+  (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800) 
+                  (lines the-lines) (colors the-colors)))
+  (define main-panel (new horizontal-panel% (parent win)
+                     (alignment '(center center)) (stretchable-height #f)))
+  (define angle-field (instantiate text-field%
+                        ("angle delta" main-panel)
+                        (callback
+                         (lambda (t e)
+                           (define num (string->number (send angle-field get-value)))
+                           (when num
+                             (set! delta-angle 
+                                   (/ (string->number (send angle-field get-value))
+                                      57.29577951308232)))))
+                        (init-value (number->string (* delta-angle 57.29577951308232)))))
+  (define position-field (instantiate text-field% 
+                           ("position delta" main-panel)
+                           (callback 
+                            (lambda (t e)
+                              (set! delta-pos
+                                    (string->number (send position-field get-value)))))
+                           (init-value (number->string delta-pos))))
   (send gl gl-init)
   (send win show #t))
