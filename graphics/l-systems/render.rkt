@@ -48,8 +48,7 @@
   (define vec-line (map vector->gl-float-vector line))
   (for ([start vec-line]
         [end (rest vec-line)])
-    (cylinder-between-points start end))
-  (cylinder-between-points (last vec-line) (first vec-line)))
+    (cylinder-between-points start end)))
 
 (define cam-x 0)
 (define cam-y 0)
@@ -96,7 +95,7 @@
   (set! cam-z (max (* z-pos 1.3) 1))
   (set! delta-pos (* cam-z .05))
   (set! delta-angle (* delta-pos .15))
-  (set! radius (* delta-pos .03)))
+  (set! radius (* delta-pos .4)))
 
 (define (draw-opengl lines colors)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)

@@ -1,7 +1,10 @@
 #lang racket
 (provide (all-defined-out))
 
-(struct turtle (x y angle verts color))
+; p is a list of x, y, z
+; orientation is a matrix (list of lists) of H, L, U
+; H, L, and U are lists of x, y, z (representing orientation vectors heading, left, and up)
+(struct turtle (p orientation verts color))
 (struct state (turt turtle-stack branch-verts colors d beta))
 
 (define (find-production prob roll prods)
@@ -32,35 +35,96 @@
                    ((interps (first string)) state)
                    (rest string))))
 
+(define (perform-move p v)
+  (map + p v))
+
 (define (move-forward a-state)
   (define d (state-d a-state))
   (define the-turtle (state-turt a-state))
+  (define heading (first (turtle-orientation the-turtle)))
   (struct-copy state a-state
                [turt (struct-copy turtle the-turtle
-                                  [x (+ (turtle-x the-turtle)
-                                        (* d (cos (turtle-angle the-turtle))))]
-                                  [y (+ (turtle-y the-turtle)
-                                        (* d (sin (turtle-angle the-turtle))))])]))
+                                  [p (perform-move
+                                      (turtle-p the-turtle)
+                                      (first (turtle-orientation the-turtle)))])]))
 
-(define (add-angle a-state angle)
-  (define the-turtle (state-turt a-state))
-  (struct-copy state a-state
-               [turt (struct-copy turtle the-turtle
-                                  [angle (+ (turtle-angle the-turtle) angle)])]))
+(define (Ru alpha)
+  (define delta (* alpha 0.0174532925))
+  (define s (sin delta))
+  (define c (cos delta))
+  (list (list c s 0)
+        (list (- s) c 0)
+        (list 0 0 1)))
+
+(define (Rl alpha)
+  (define delta (* alpha 0.0174532925))
+  (define s (sin delta))
+  (define c (cos delta))
+  (list (list c 0 (- s))
+        (list 0 1 0)
+        (list s 0 c)))
+
+(define (Rh alpha)
+  (define delta (* alpha 0.0174532925))
+  (define s (sin delta))
+  (define c (cos delta))
+  (list (list 1 0 0)
+        (list 0 c (- s))
+        (list 0 s c)))
+
+(define (transpose mat)
+  (apply map list mat))
+
+(define (m-mult-helper m1 m2)
+  (for/list ([r m1]) 
+    (for/list ([c (transpose m2)])
+      (apply + (map * r c)))))
+
+(define (m-mult m1 m2)
+  (transpose (m-mult-helper (transpose m1) m2)))
+
+(define (update-orientation a-turtle mat)
+  (define orientation (turtle-orientation a-turtle))
+  (struct-copy turtle a-turtle
+               [orientation (m-mult orientation mat)]))
 
 (define (rotate-left a-state)
-  (define beta (* (state-beta a-state) 0.0174532925))
-  (add-angle a-state beta))
+  (define beta (state-beta a-state))
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Ru (- beta)))]))
 
 (define (rotate-right a-state)
-  (define beta (* (state-beta a-state) 0.0174532925))
-  (add-angle a-state (- beta)))
+  (define beta (state-beta a-state))
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Ru beta))]))
+
+(define (pitch-up a-state)
+  (define beta (state-beta a-state))
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Rl beta))]))
+
+(define (pitch-down a-state)
+  (define beta (state-beta a-state))
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Rl (- beta)))]))
+
+(define (roll-left a-state)
+  (define beta (state-beta a-state))
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Rh (- beta)))]))
+
+(define (roll-right a-state)
+  (define beta (state-beta a-state))
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Rh beta))]))
+
+(define (turn-around a-state)
+  (struct-copy state a-state
+               [turt (update-orientation (state-turt a-state) (Ru 180))]))
 
 (define (vector-from-state a-state)
-  (define the-turtle (state-turt a-state))
-  (vector (turtle-x the-turtle)
-          (turtle-y the-turtle)
-          0))
+  (define p (turtle-p (state-turt a-state)))
+  (list->vector p))
 
 (define (add-vert a-state vert)
   (define the-turtle (state-turt a-state))
@@ -101,8 +165,13 @@
 (define global-interp
   (match-lambda
     ['F move-forward-and-draw]
-    ['- rotate-right]
-    ['+ rotate-left]
     ['\[ push-turtle]
     ['\] pop-turtle]
+    ['- rotate-right]
+    ['+ rotate-left]
+    ['& pitch-down]
+    ['^ pitch-up]
+    ['> roll-right]
+    ['< roll-left]
+    ['! turn-around]
     [x (lambda (x) x)]))
