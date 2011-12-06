@@ -12,6 +12,12 @@
 
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
+  
+  (gl-light-v 'light0 'position (gl-float-vector 1 1 1 0))
+  
+  (gl-shade-model 'smooth)
+  (gl-enable 'lighting)
+  (gl-enable 'light0)
   (gl-depth-func 'lequal)
   (gl-enable 'depth-test))
 
