@@ -7,19 +7,19 @@
 (struct turtle (p orientation verts color))
 (struct state (turt turtle-stack branch-verts colors d beta))
 
-(define (find-production prob roll prods)
-  (match prods
-    [(list (list num ans)) 
-     ans]
-    [(list (list num ans) another ...)
-     (if (< roll (+ prob num))
-         ans
-         (find-production (+ prob num) roll another))]))
-
-;ask how to do this cool
-(define (random-production prods)
-  (define roll (random))
-  (find-production 0 roll prods))
+(define global-interp
+  (match-lambda
+    ['F move-forward-and-draw]
+    ['\[ push-turtle]
+    ['\] pop-turtle]
+    ['- rotate-right]
+    ['+ rotate-left]
+    ['& pitch-down]
+    ['^ pitch-up]
+    ['> roll-right]
+    ['< roll-left]
+    ['! turn-around]
+    [x (lambda (x) x)]))
 
 ;eval-lsys : (symbol->listOfSymbol) nat listOfSymbol -> listOfSymbol
 (define (eval-lsys produce generations axiom)
@@ -34,6 +34,19 @@
       (turtle-eval interps
                    ((interps (first string)) state)
                    (rest string))))
+
+(define (find-production prob roll prods)
+  (match prods
+    [(list (list num ans)) 
+     ans]
+    [(list (list num ans) another ...)
+     (if (< roll (+ prob num))
+         ans
+         (find-production (+ prob num) roll another))]))
+
+(define (random-production prods)
+  (define roll (random))
+  (find-production 0 roll prods))
 
 (define (perform-move p v)
   (map + p v))
@@ -161,17 +174,3 @@
                                    (state-branch-verts a-state))]
                [colors (cons (turtle-color (state-turt a-state))
                              (state-colors a-state))]))
-
-(define global-interp
-  (match-lambda
-    ['F move-forward-and-draw]
-    ['\[ push-turtle]
-    ['\] pop-turtle]
-    ['- rotate-right]
-    ['+ rotate-left]
-    ['& pitch-down]
-    ['^ pitch-up]
-    ['> roll-right]
-    ['< roll-left]
-    ['! turn-around]
-    [x (lambda (x) x)]))

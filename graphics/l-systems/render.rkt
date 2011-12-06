@@ -12,9 +12,7 @@
 
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
-  
   (gl-light-v 'light0 'position (gl-float-vector 1 1 1 0))
-  
   (gl-shade-model 'smooth)
   (gl-enable 'lighting)
   (gl-enable 'light0)
@@ -35,12 +33,12 @@
 (define radius 0.01)
 (define (cylinder-between-points a b)
   (define z (gl-float-vector 0 0 1))
-  (define p (sub-vectors a b))
+  (define p (sub-vectors b a))
   (define p-len (vec-length p))
   (define t (cross-product z p))
   (define angle (* 57.29577951308232 
                    (acos (/ (dot-product z p) p-len))))
-  (define-values (tx ty tz) (get-vector-elements b))
+  (define-values (tx ty tz) (get-vector-elements a))
   (define-values (rx ry rz) (get-vector-elements t))
   (gl-push-matrix)
   (gl-translate tx ty tz)
@@ -49,12 +47,21 @@
   (gluCylinder (gluNewQuadric) radius radius p-len 40 40)
   (gl-pop-matrix))
 
+(define (sphere-at-point p)
+  (define-values (x y z) (get-vector-elements p))
+  (gl-push-matrix)
+  (gl-translate x y z)
+  (gluSphere (gluNewQuadric) radius 40 40)
+  (gl-pop-matrix))
+
 (define (draw-line line color)
-  (gl-color-v (vector->gl-float-vector color))
+  (gl-material-v 'front 'ambient-and-diffuse 
+                 (vector->gl-float-vector (vector-append color #(1))))
   (define vec-line (map vector->gl-float-vector line))
   (for ([start vec-line]
         [end (rest vec-line)])
-    (cylinder-between-points start end)))
+    (cylinder-between-points start end))
+  (sphere-at-point (last vec-line)))
 
 (define cam-x 0)
 (define cam-y 0)

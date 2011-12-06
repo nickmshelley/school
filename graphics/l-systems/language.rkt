@@ -82,4 +82,3 @@
                       (x2:number y2:number z2:number))
     (syntax/loc stx
       (make-orientation* (list x1 y1 z1) (list x2 y2 z2)))]))
-
