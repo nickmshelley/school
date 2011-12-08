@@ -1,6 +1,20 @@
 #lang racket
 (provide (all-defined-out))
 
+;eval-lsys : (symbol->listOfSymbol) nat listOfSymbol -> listOfSymbol
+(define (eval-lsys produce generations axiom)
+  (if (zero? generations)
+      axiom
+      (eval-lsys produce (sub1 generations) (append-map random-production (map produce axiom)))))
+
+;turtle-eval : (symbol->function) state listOfSymbol -> state
+(define (turtle-eval interps state string)
+  (if (empty? string)
+      state
+      (turtle-eval interps
+                   ((interps (first string)) state)
+                   (rest string))))
+
 ; p is a list of x, y, z
 ; orientation is a matrix (list of lists) of H, L, U
 ; H, L, and U are lists of x, y, z (representing orientation vectors heading, left, and up)
@@ -20,20 +34,6 @@
     ['< roll-left]
     ['! turn-around]
     [x (lambda (x) x)]))
-
-;eval-lsys : (symbol->listOfSymbol) nat listOfSymbol -> listOfSymbol
-(define (eval-lsys produce generations axiom)
-  (if (zero? generations)
-      axiom
-      (eval-lsys produce (sub1 generations) (append-map random-production (map produce axiom)))))
-
-;turtle-eval : (symbol->function) state listOfSymbol -> state
-(define (turtle-eval interps state string)
-  (if (empty? string)
-      state
-      (turtle-eval interps
-                   ((interps (first string)) state)
-                   (rest string))))
 
 (define (find-production prob roll prods)
   (match prods
@@ -108,12 +108,12 @@
 (define (rotate-left a-state)
   (define beta (state-beta a-state))
   (struct-copy state a-state
-               [turt (update-orientation (state-turt a-state) (Ru (- beta)))]))
+               [turt (update-orientation (state-turt a-state) (Ru beta))]))
 
 (define (rotate-right a-state)
   (define beta (state-beta a-state))
   (struct-copy state a-state
-               [turt (update-orientation (state-turt a-state) (Ru beta))]))
+               [turt (update-orientation (state-turt a-state) (Ru (- beta)))]))
 
 (define (pitch-up a-state)
   (define beta (state-beta a-state))
@@ -128,12 +128,12 @@
 (define (roll-left a-state)
   (define beta (state-beta a-state))
   (struct-copy state a-state
-               [turt (update-orientation (state-turt a-state) (Rh (- beta)))]))
+               [turt (update-orientation (state-turt a-state) (Rh beta))]))
 
 (define (roll-right a-state)
   (define beta (state-beta a-state))
   (struct-copy state a-state
-               [turt (update-orientation (state-turt a-state) (Rh beta))]))
+               [turt (update-orientation (state-turt a-state) (Rh (- beta)))]))
 
 (define (turn-around a-state)
   (struct-copy state a-state

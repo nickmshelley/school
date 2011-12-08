@@ -1,8 +1,8 @@
 #lang s-exp "language.rkt"
 
 beta -> 90
-start-heading -> (1 1 0)
-start-up -> (0 0 1)
+start-heading -> (0 0 -1)
+start-up -> (0 1 0)
 radius -> .03
 length -> .1
 generations -> 3

@@ -10,9 +10,27 @@
 
 (provide render)
 
+(define (draw-opengl lines colors)
+  (gl-clear 'color-buffer-bit 'depth-buffer-bit)
+  (gl-push-matrix)
+  (gluLookAt cam-x cam-y cam-z
+             (+ cam-x look-x) (+ cam-y look-y) (+ cam-z look-z)
+             0 1 0)
+  (map draw-line lines colors)
+  (gl-pop-matrix))
+
+(define (draw-line line color)
+  (gl-material-v 'front 'ambient-and-diffuse 
+                 (vector->gl-float-vector (vector-append color #(1))))
+  (define vec-line (map vector->gl-float-vector line))
+  (for ([start vec-line]
+        [end (rest vec-line)])
+    (cylinder-between-points start end))
+  (sphere-at-point (last vec-line)))
+
 (define (init-opengl)
   (gl-clear-color 1 1 1 1)
-  (gl-light-v 'light0 'position (gl-float-vector 1 1 1 0))
+  (gl-light-v 'light0 'position (gl-float-vector 0 0 1 0))
   (gl-shade-model 'smooth)
   (gl-enable 'lighting)
   (gl-enable 'light0)
@@ -53,15 +71,6 @@
   (gl-translate x y z)
   (gluSphere (gluNewQuadric) radius 40 40)
   (gl-pop-matrix))
-
-(define (draw-line line color)
-  (gl-material-v 'front 'ambient-and-diffuse 
-                 (vector->gl-float-vector (vector-append color #(1))))
-  (define vec-line (map vector->gl-float-vector line))
-  (for ([start vec-line]
-        [end (rest vec-line)])
-    (cylinder-between-points start end))
-  (sphere-at-point (last vec-line)))
 
 (define cam-x 0)
 (define cam-y 0)
@@ -109,15 +118,6 @@
   (set! delta-pos (* cam-z .05))
   (set! delta-angle (* delta-pos .15)))
 
-(define (draw-opengl lines colors)
-  (gl-clear 'color-buffer-bit 'depth-buffer-bit)
-  (gl-push-matrix)
-  (gluLookAt cam-x cam-y cam-z
-             (+ cam-x look-x) (+ cam-y look-y) (+ cam-z look-z)
-             0 1 0)
-  (map draw-line lines colors)
-  (gl-pop-matrix))
-
 (define (look-left)
   (set! rotate-angle (- rotate-angle delta-angle))
   (set! look-x (sin rotate-angle))
@@ -154,6 +154,7 @@
 (define (go-down)
   (set! cam-y (- cam-y delta-pos)))
 
+(define RATE 1/10)
 (define my-canvas%
   (class* canvas% ()
     (inherit refresh with-gl-context swap-gl-buffers)
@@ -169,8 +170,11 @@
     (define/override (on-paint)
       (with-gl-context
        (lambda ()
+         (define next-time 
+           (+ (current-inexact-milliseconds) (* RATE 1000)))
          (draw-opengl lines colors)
          (swap-gl-buffers)
+         (sync (alarm-evt next-time))
          (queue-callback (lambda x (send this refresh)) #f))))
     
     (define/override (on-size width height)
