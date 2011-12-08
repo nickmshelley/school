@@ -55,11 +55,15 @@
   (define d (state-d a-state))
   (define the-turtle (state-turt a-state))
   (define heading (first (turtle-orientation the-turtle)))
+  (define scaled
+    (map (lambda (x)
+           (* x d))
+         (first (turtle-orientation the-turtle))))
   (struct-copy state a-state
                [turt (struct-copy turtle the-turtle
                                   [p (perform-move
                                       (turtle-p the-turtle)
-                                      (first (turtle-orientation the-turtle)))])]))
+                                      scaled)])]))
 
 (define (Ru alpha)
   (define delta (* alpha 0.0174532925))

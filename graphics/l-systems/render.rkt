@@ -107,8 +107,7 @@
   (set! cam-y y-ave)
   (set! cam-z (max (* z-pos 1.3) 1))
   (set! delta-pos (* cam-z .05))
-  (set! delta-angle (* delta-pos .15))
-  (set! radius (* delta-pos .4)))
+  (set! delta-angle (* delta-pos .15)))
 
 (define (draw-opengl lines colors)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
@@ -194,7 +193,8 @@
     
     (super-instantiate () (style '(gl)))))
 
-(define (render final-state)
+(define (render final-state r)
+  (set! radius r)
   (define the-lines (cons (turtle-verts (state-turt final-state))
                           (state-branch-verts final-state)))
   (define the-colors (cons (turtle-color (state-turt final-state))

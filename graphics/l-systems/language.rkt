@@ -15,6 +15,7 @@
      (~datum beta) (~datum ->) beta*:number
      (~datum start-heading) (~datum ->) start-heading*:expr
      (~datum start-up) (~datum ->) start-up*:expr
+     (~datum radius) (~datum ->) radius*:number
      (~datum length) (~datum ->) length*:number
      (~datum generations) (~datum ->) generations*:number
      (~datum axiom) (~datum ->) (~seq axiom*:id (~peek-not (~datum ->))) ...
@@ -40,7 +41,8 @@
                                       ...)]
                               ...
                               [x (list (list 1 (list x)))])
-                            generations* '(axiom* ...)))))]))
+                            generations* '(axiom* ...)))
+              radius*))]))
 
 (define-syntax-rule (my-module-begin body ...)
   (#%plain-module-begin
