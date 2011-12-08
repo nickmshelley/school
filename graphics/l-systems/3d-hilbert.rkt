@@ -3,7 +3,8 @@
 beta -> 90
 start-heading -> (1 1 0)
 start-up -> (0 0 1)
-length -> .01
+radius -> .03
+length -> .1
 generations -> 3
 axiom -> A
 A -> 1 => B - F + C F C + F - D & F ^ D - F + & & C F C + F + B > >

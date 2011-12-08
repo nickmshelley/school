@@ -29,7 +29,7 @@
                            (state (turtle (list 0 0 0) 
                                           (make-orientation start-heading* start-up*)
                                           (list (vector 0 0 0))
-                                          (vector .3 .1 .3))
+                                          (vector .2 .1 .2))
                                   empty
                                   empty
                                   empty
@@ -74,8 +74,8 @@
   (define h-norm (normalize h))
   (define u-norm (normalize u))
   (list h-norm 
-        u-norm
-        (cross-product h-norm u-norm)))
+        (cross-product h-norm u-norm)
+        u-norm))
 
 (define-syntax (make-orientation stx)
   (syntax-parse
