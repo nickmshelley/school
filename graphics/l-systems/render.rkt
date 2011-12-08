@@ -10,14 +10,21 @@
 
 (provide render)
 
-(define (draw-opengl lines colors)
+(define model #f)
+
+(define (draw-opengl)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
   (gl-push-matrix)
   (gluLookAt cam-x cam-y cam-z
              (+ cam-x look-x) (+ cam-y look-y) (+ cam-z look-z)
              0 1 0)
-  (map draw-line lines colors)
+  (gl-call-list model)
   (gl-pop-matrix))
+
+(define (create-model lines colors)
+  (gl-new-list model 'compile-and-execute)
+  (map draw-line lines colors)
+  (gl-end-list))
 
 (define (draw-line line color)
   (gl-material-v 'front 'ambient-and-diffuse 
@@ -29,6 +36,7 @@
   (sphere-at-point (last vec-line)))
 
 (define (init-opengl)
+  (set! model (gl-gen-lists 1))
   (gl-clear-color 1 1 1 1)
   (gl-light-v 'light0 'position (gl-float-vector 0 0 1 0))
   (gl-shade-model 'smooth)
@@ -159,20 +167,18 @@
   (class* canvas% ()
     (inherit refresh with-gl-context swap-gl-buffers)
     
-    (init-field lines)
-    (init-field colors)
-    
-    (define/public (gl-init)
+    (define/public (gl-init lines colors)
       (with-gl-context
        (lambda ()
-         (init-opengl))))
+         (init-opengl)
+         (create-model lines colors))))
     
     (define/override (on-paint)
       (with-gl-context
        (lambda ()
          (define next-time 
            (+ (current-inexact-milliseconds) (* RATE 1000)))
-         (draw-opengl lines colors)
+         (draw-opengl)
          (swap-gl-buffers)
          (sync (alarm-evt next-time))
          (queue-callback (lambda x (send this refresh)) #f))))
@@ -206,10 +212,9 @@
   (analyze! the-lines)
   
   (define win (new frame% (label "L-Systems")))
-  (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800) 
-                  (lines the-lines) (colors the-colors)))
+  (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800)))
   (define main-panel (new horizontal-panel% (parent win)
-                     (alignment '(center center)) (stretchable-height #f)))
+                          (alignment '(center center)) (stretchable-height #f)))
   (define angle-field (instantiate text-field%
                         ("angle delta" main-panel)
                         (callback
@@ -227,5 +232,5 @@
                               (set! delta-pos
                                     (string->number (send position-field get-value)))))
                            (init-value (number->string delta-pos))))
-  (send gl gl-init)
-  (send win show #t))
+  (send win show #t)
+  (send gl gl-init the-lines the-colors))

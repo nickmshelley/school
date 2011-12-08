@@ -5,6 +5,6 @@ start-heading -> (0 1 0)
 start-up -> (0 0 1)
 radius -> .02
 length -> .1
-generations -> 5
+generations -> 4
 axiom -> F
 F -> 1 => F F - [- F + F + F] + [+ F - F - F]
