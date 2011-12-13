@@ -11,6 +11,8 @@
 (provide render)
 
 (define model 0)
+(define cylinder 0)
+(define sphere 0)
 
 (define (draw-opengl)
   (gl-clear 'color-buffer-bit 'depth-buffer-bit)
@@ -27,28 +29,36 @@
   (map draw-line lines colors)
   (gl-end-list))
 
-(define (create-model lines colors)
-  (define lines-per-list 10)
-  (define num-lines (length lines))
-  (define range (inexact->exact (ceiling (/ num-lines lines-per-list))))
-  (define start-list (gl-gen-lists range))
-  (define line-list
-    (append
-     (for/list ([i (in-range (sub1 (/ num-lines lines-per-list)))])
-       (take (list-tail lines (* i lines-per-list)) lines-per-list))
-     (list (take-right lines (modulo num-lines lines-per-list)))))
-  (define color-list
-    (append
-     (for/list ([i (in-range (sub1 (/ num-lines lines-per-list)))])
-       (take (list-tail colors (* i lines-per-list)) lines-per-list))
-     (list (take-right colors (modulo num-lines lines-per-list)))))
-  (map create-sub-list 
-       (sequence->list (in-range start-list (+ start-list range)))
-       line-list
-       color-list)
+(define (create-model lines colors line-length radius)
+  (gl-new-list sphere 'compile)
+  (gluSphere (gluNewQuadric) radius 10 10)
+  (gl-end-list)
+  (gl-new-list cylinder 'compile)
+  (gluCylinder (gluNewQuadric) radius radius line-length 10 10)
+  (gl-end-list)
+  
+  ;  (define lines-per-list 10000)
+  ;  (define num-lines (length lines))
+  ;  (print num-lines)
+  ;  (define range (inexact->exact (ceiling (/ num-lines lines-per-list))))
+  ;  (define start-list (gl-gen-lists range))
+  ;  (define line-list
+  ;    (append
+  ;     (for/list ([i (in-range (sub1 (/ num-lines lines-per-list)))])
+  ;       (take (list-tail lines (* i lines-per-list)) lines-per-list))
+  ;     (list (take-right lines (modulo num-lines lines-per-list)))))
+  ;  (define color-list
+  ;    (append
+  ;     (for/list ([i (in-range (sub1 (/ num-lines lines-per-list)))])
+  ;       (take (list-tail colors (* i lines-per-list)) lines-per-list))
+  ;     (list (take-right colors (modulo num-lines lines-per-list)))))
+  ;  (map create-sub-list 
+  ;       (sequence->list (in-range start-list (+ start-list range)))
+  ;       line-list
+  ;       color-list)
+  
   (gl-new-list model 'compile)
-  (for ([i (in-range start-list (+ start-list range))])
-    (gl-call-list i))
+  (map draw-line lines colors)
   (gl-end-list))
 
 (define (draw-line line color)
@@ -62,6 +72,8 @@
 
 (define (init-opengl)
   (set! model (gl-gen-lists 1))
+  (set! cylinder (gl-gen-lists 1))
+  (set! sphere (gl-gen-lists 1))
   (gl-clear-color 1 1 1 1)
   (gl-light-v 'light0 'position (gl-float-vector 0 0 1 0))
   (gl-shade-model 'smooth)
@@ -81,7 +93,6 @@
   (gl-viewport 0 0 w h)
   #t)
 
-(define radius 0.01)
 (define (cylinder-between-points a b)
   (define z (gl-float-vector 0 0 1))
   (define p (sub-vectors b a))
@@ -94,15 +105,15 @@
   (gl-push-matrix)
   (gl-translate tx ty tz)
   (gl-rotate angle rx ry rz)
-  (gluSphere (gluNewQuadric) radius 40 40)
-  (gluCylinder (gluNewQuadric) radius radius p-len 40 40)
+  (gl-call-list sphere)
+  (gl-call-list cylinder)
   (gl-pop-matrix))
 
 (define (sphere-at-point p)
   (define-values (x y z) (get-vector-elements p))
   (gl-push-matrix)
   (gl-translate x y z)
-  (gluSphere (gluNewQuadric) radius 40 40)
+  (gl-call-list sphere)
   (gl-pop-matrix))
 
 (define cam-x 0)
@@ -119,6 +130,12 @@
 (define delta-pos .1)
 
 (define (analyze! lines)
+  (printf "total lines: ~v~ntotal segments: ~v~n"
+          (length lines)
+          (foldl (lambda (l accum)
+                    (+ (length l) accum))
+                  0
+                  lines))
   (define xs 
     (append-map (lambda (v)
                   (map vector-ref v
@@ -192,11 +209,11 @@
   (class* canvas% ()
     (inherit refresh with-gl-context swap-gl-buffers)
     
-    (define/public (gl-init lines colors)
+    (define/public (gl-init lines colors line-length radius)
       (with-gl-context
        (lambda ()
          (init-opengl)
-         (create-model lines colors))))
+         (create-model lines colors line-length radius))))
     
     (define/override (on-paint)
       (with-gl-context
@@ -228,17 +245,17 @@
     
     (super-instantiate () (style '(gl)))))
 
-(define (render final-state r)
-  (set! radius r)
+(define (render final-state radius)
   (define the-lines (cons (turtle-verts (state-turt final-state))
                           (state-branch-verts final-state)))
   (define the-colors (cons (turtle-color (state-turt final-state))
                            (state-colors final-state)))
+  (define line-length (state-d final-state))
   (analyze! the-lines)
   
   (define win (new frame% (label "L-Systems")))
   (define gl (new my-canvas% (parent win) (min-width 800) (min-height 800)))
-  (send gl gl-init the-lines the-colors)
+  (send gl gl-init the-lines the-colors line-length radius)
   (define main-panel (new horizontal-panel% (parent win)
                           (alignment '(center center)) (stretchable-height #f)))
   (define angle-field (instantiate text-field%
